@@ -4,6 +4,11 @@
   "description": "Shows Claude Code rate limits in VSCode status bar",
   "version": "0.1.2",
   "publisher": "maslovserg",
+  "icon": "generated-image.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maslovserg-hub/claude-limits-vscode"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
