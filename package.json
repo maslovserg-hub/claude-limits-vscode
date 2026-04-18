@@ -1,0 +1,40 @@
+{
+  "name": "claude-limits",
+  "displayName": "Claude Limits Monitor",
+  "description": "Shows Claude Code rate limits in VSCode status bar",
+  "version": "0.1.2",
+  "publisher": "maslovserg",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudeLimits.refresh",
+        "title": "Claude Limits: Refresh"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}
