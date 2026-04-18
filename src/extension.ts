@@ -51,6 +51,9 @@ export function activate(context: vscode.ExtensionContext) {
   fs.watchFile(LIMITS_FILE, { interval: 1000 }, refresh);
   context.subscriptions.push({ dispose: () => fs.unwatchFile(LIMITS_FILE) });
 
+  const timer = setInterval(refresh, 60_000);
+  context.subscriptions.push({ dispose: () => clearInterval(timer) });
+
   refresh();
 }
 

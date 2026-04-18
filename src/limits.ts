@@ -10,14 +10,19 @@ const BAR_WIDTH = 6;
 export function parseLimits(jsonStr: string): LimitsData | null {
   try {
     const data = JSON.parse(jsonStr);
-    const fh = data?.five_hour?.used_percentage;
-    const sd = data?.seven_day?.used_percentage;
+    let fh = data?.five_hour?.used_percentage;
+    let sd = data?.seven_day?.used_percentage;
     if (typeof fh !== 'number' || typeof sd !== 'number') return null;
+    const fhResetsAt: string | undefined = data.five_hour?.resets_at;
+    const sdResetsAt: string | undefined = data.seven_day?.resets_at;
+    const now = Date.now();
+    if (fhResetsAt && new Date(fhResetsAt).getTime() <= now) fh = 0;
+    if (sdResetsAt && new Date(sdResetsAt).getTime() <= now) sd = 0;
     return {
       fiveHour: fh,
       sevenDay: sd,
-      fiveHourResetsAt: data.five_hour?.resets_at,
-      sevenDayResetsAt: data.seven_day?.resets_at,
+      fiveHourResetsAt: fh > 0 ? fhResetsAt : undefined,
+      sevenDayResetsAt: sd > 0 ? sdResetsAt : undefined,
     };
   } catch {
     return null;
