@@ -61,66 +61,22 @@ Status bar color changes with usage level:
 
 ## Setup
 
-### 1. Install the extension
+### Install the extension
 
 Install from `.vsix` via `Extensions → ··· → Install from VSIX`.
 
-### 2. Create the hook script
+**That's it.** On first activation the extension automatically:
 
-Create `~/.claude/hooks/save-limits.sh`:
+1. Creates `~/.claude/hooks/save-limits.sh`
+2. Registers the Stop hook in `~/.claude/settings.json`
 
-```bash
-#!/bin/bash
-node -e "
-const https = require('https');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+A one-time notification confirms the hook was configured. After your next Claude Code session ends, the status bar will populate with live data.
 
-const credsPath = path.join(os.homedir(), '.claude', '.credentials.json');
-let token;
-try {
-  const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-  token = creds.claudeAiOauth?.accessToken;
-  if (!token) process.exit(0);
-} catch (e) { process.exit(0); }
+> **No `jq` required.** The hook script uses only Node.js, which is already bundled with Claude Code.
 
-const options = {
-  hostname: 'api.anthropic.com',
-  path: '/api/oauth/usage',
-  headers: {
-    'Authorization': 'Bearer ' + token,
-    'Content-Type': 'application/json',
-    'anthropic-beta': 'oauth-2025-04-20'
-  }
-};
+#### Manual setup (optional)
 
-https.get(options, res => {
-  let data = '';
-  res.on('data', c => data += c);
-  res.on('end', () => {
-    try {
-      const d = JSON.parse(data);
-      const output = {
-        five_hour: { used_percentage: d.five_hour?.utilization || 0, resets_at: d.five_hour?.resets_at || null },
-        seven_day: { used_percentage: d.seven_day?.utilization || 0, resets_at: d.seven_day?.resets_at || null }
-      };
-      fs.writeFileSync(path.join(os.homedir(), '.claude', 'limits.json'), JSON.stringify(output));
-    } catch (e) {}
-  });
-}).on('error', () => {});
-"
-```
-
-Make it executable (macOS / Linux):
-
-```bash
-chmod +x ~/.claude/hooks/save-limits.sh
-```
-
-### 3. Register the hook in Claude Code
-
-Add to `~/.claude/settings.json`:
+If you prefer to configure the hook yourself, or the automatic setup didn't run, add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -136,13 +92,11 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-On **Windows**, use the full path with quotes:
+On **Windows**, use the full path:
 
 ```json
 "command": "bash \"C:/Users/YourName/.claude/hooks/save-limits.sh\""
 ```
-
-After setup, the status bar will populate after your next Claude Code session ends.
 
 ---
 
@@ -173,6 +127,10 @@ Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) or by clicking e
 ---
 
 ## Release Notes
+
+### 0.1.5
+- **Auto-setup on install** — extension now automatically creates the hook script and registers it in `~/.claude/settings.json`; no manual configuration needed
+- **No `jq` dependency** — hook script rewritten to use only Node.js (works on all systems)
 
 ### 0.1.4
 - Switched to `icon.png`

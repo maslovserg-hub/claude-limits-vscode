@@ -4,10 +4,89 @@ import * as os from 'os';
 import * as path from 'path';
 import { parseLimits, formatFiveHourText, formatSevenDayText } from './limits';
 
-const LIMITS_FILE = path.join(os.homedir(), '.claude', 'limits.json');
+const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+const LIMITS_FILE = path.join(CLAUDE_DIR, 'limits.json');
+const HOOKS_DIR = path.join(CLAUDE_DIR, 'hooks');
+const HOOK_SCRIPT = path.join(HOOKS_DIR, 'save-limits.sh');
+const CLAUDE_SETTINGS = path.join(CLAUDE_DIR, 'settings.json');
 const COLOR_EXCEEDED = '#D4875A';
 
+const HOOK_CONTENT = `#!/usr/bin/env bash
+# Claude Limits Monitor: fetches rate limits after each response
+node -e "
+const https = require('https');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const credsPath = path.join(os.homedir(), '.claude', '.credentials.json');
+let token;
+try {
+  const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+  token = creds.claudeAiOauth?.accessToken;
+  if (!token) process.exit(0);
+} catch(e) { process.exit(0); }
+
+https.get({
+  hostname: 'api.anthropic.com',
+  path: '/api/oauth/usage',
+  headers: {
+    'Authorization': 'Bearer ' + token,
+    'anthropic-beta': 'oauth-2025-04-20'
+  }
+}, res => {
+  let data = '';
+  res.on('data', c => data += c);
+  res.on('end', () => {
+    try {
+      const d = JSON.parse(data);
+      const out = {
+        five_hour: { used_percentage: d.five_hour?.utilization || 0, resets_at: d.five_hour?.resets_at || null },
+        seven_day: { used_percentage: d.seven_day?.utilization || 0, resets_at: d.seven_day?.resets_at || null }
+      };
+      fs.writeFileSync(path.join(os.homedir(), '.claude', 'limits.json'), JSON.stringify(out));
+    } catch(e) {}
+  });
+}).on('error', () => {});
+"
+`;
+
+function ensureHookSetup(): boolean {
+  try {
+    fs.mkdirSync(HOOKS_DIR, { recursive: true });
+    fs.writeFileSync(HOOK_SCRIPT, HOOK_CONTENT, { mode: 0o755 });
+
+    let settings: Record<string, unknown> = {};
+    try { settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8')); } catch {}
+
+    const hookCmd = `bash "${HOOK_SCRIPT.replace(/\\/g, '/')}"`;
+
+    const stopGroups: unknown[] = (settings.hooks as Record<string, unknown>)?.Stop as unknown[] ?? [];
+    const alreadySet = stopGroups.some((g: unknown) =>
+      (g as { hooks?: { command?: string }[] })?.hooks?.some(h => h?.command?.includes('save-limits.sh'))
+    );
+    if (alreadySet) return false;
+
+    if (!settings.hooks) { settings.hooks = {}; }
+    const hooks = settings.hooks as Record<string, unknown[]>;
+    if (!hooks.Stop) { hooks.Stop = []; }
+    hooks.Stop.push({ matcher: '', hooks: [{ type: 'command', command: hookCmd }] });
+
+    fs.writeFileSync(CLAUDE_SETTINGS, JSON.stringify(settings, null, 2));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function activate(context: vscode.ExtensionContext) {
+  const didSetup = ensureHookSetup();
+  if (didSetup) {
+    vscode.window.showInformationMessage(
+      'Claude Limits Monitor: hook configured. Limits will update after each Claude response.'
+    );
+  }
+
   const itemFiveHour = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
   itemFiveHour.command = 'claudeLimits.refresh';
   itemFiveHour.tooltip = 'Claude: 5-hour session limit';
@@ -25,7 +104,6 @@ export function activate(context: vscode.ExtensionContext) {
       if (limits) {
         itemFiveHour.text = formatFiveHourText(limits);
         itemFiveHour.color = limits.fiveHour >= 80 ? COLOR_EXCEEDED : undefined;
-
         itemSevenDay.text = formatSevenDayText(limits);
         itemSevenDay.color = limits.sevenDay >= 80 ? COLOR_EXCEEDED : undefined;
       } else {
