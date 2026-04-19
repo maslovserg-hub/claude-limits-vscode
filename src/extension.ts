@@ -80,12 +80,7 @@ function ensureHookSetup(): boolean {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  const didSetup = ensureHookSetup();
-  if (didSetup) {
-    vscode.window.showInformationMessage(
-      'Claude Limits Monitor: hook configured. Limits will update after each Claude response.'
-    );
-  }
+  ensureHookSetup();
 
   const itemFiveHour = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
   itemFiveHour.command = 'claudeLimits.refresh';
