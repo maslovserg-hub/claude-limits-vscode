@@ -128,6 +128,9 @@ Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) or by clicking e
 
 ## Release Notes
 
+### 0.1.8
+- **Fixed click-to-refresh** — extension now makes the HTTP request directly (no bash), spinner is visible during actual API wait
+
 ### 0.1.7
 - **Click to refresh** — clicking the status bar item triggers a live API fetch and shows a spinner while loading
 

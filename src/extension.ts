@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
-import { exec } from 'child_process';
 import { parseLimits, formatFiveHourText, formatSevenDayText } from './limits';
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
@@ -121,10 +121,42 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function fetchAndRefresh() {
-    itemFiveHour.text = '$(sync~spin) Claude...';
+    itemFiveHour.text = '$(sync~spin) Обновление...';
     itemSevenDay.text = '';
-    const cmd = `bash "${HOOK_SCRIPT.replace(/\\/g, '/')}"`;
-    exec(cmd, () => refresh());
+    itemFiveHour.show();
+    itemSevenDay.show();
+
+    const credsPath = path.join(CLAUDE_DIR, '.credentials.json');
+    let token: string;
+    try {
+      const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+      token = creds.claudeAiOauth?.accessToken;
+      if (!token) { refresh(); return; }
+    } catch { refresh(); return; }
+
+    const req = https.get({
+      hostname: 'api.anthropic.com',
+      path: '/api/oauth/usage',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'anthropic-beta': 'oauth-2025-04-20'
+      }
+    }, (res) => {
+      let data = '';
+      res.on('data', (c: Buffer) => { data += c.toString(); });
+      res.on('end', () => {
+        try {
+          const d = JSON.parse(data);
+          const out = {
+            five_hour: { used_percentage: d.five_hour?.utilization || 0, resets_at: d.five_hour?.resets_at || null },
+            seven_day: { used_percentage: d.seven_day?.utilization || 0, resets_at: d.seven_day?.resets_at || null }
+          };
+          fs.writeFileSync(LIMITS_FILE, JSON.stringify(out));
+        } catch {}
+        refresh();
+      });
+    });
+    req.on('error', () => refresh());
   }
 
   context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.refresh', fetchAndRefresh));

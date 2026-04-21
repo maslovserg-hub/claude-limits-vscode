@@ -2,7 +2,7 @@
   "name": "claude-limits",
   "displayName": "Claude Limits Monitor",
   "description": "Shows Claude Code rate limits in VSCode status bar",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "publisher": "maslovserg",
   "icon": "icon.png",
   "repository": {
