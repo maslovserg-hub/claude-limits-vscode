@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { exec } from 'child_process';
 import { parseLimits, formatFiveHourText, formatSevenDayText } from './limits';
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
@@ -119,7 +120,14 @@ export function activate(context: vscode.ExtensionContext) {
     itemSevenDay.show();
   }
 
-  context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.refresh', refresh));
+  function fetchAndRefresh() {
+    itemFiveHour.text = '$(sync~spin) Claude...';
+    itemSevenDay.text = '';
+    const cmd = `bash "${HOOK_SCRIPT.replace(/\\/g, '/')}"`;
+    exec(cmd, () => refresh());
+  }
+
+  context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.refresh', fetchAndRefresh));
 
   fs.watchFile(LIMITS_FILE, { interval: 1000 }, refresh);
   context.subscriptions.push({ dispose: () => fs.unwatchFile(LIMITS_FILE) });

@@ -128,6 +128,12 @@ Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) or by clicking e
 
 ## Release Notes
 
+### 0.1.7
+- **Click to refresh** — clicking the status bar item triggers a live API fetch and shows a spinner while loading
+
+### 0.1.6
+- Version bump to republish with updated release notes
+
 ### 0.1.5
 - **Auto-setup on install** — extension now automatically creates the hook script and registers it in `~/.claude/settings.json`; no manual configuration needed
 - **No `jq` dependency** — hook script rewritten to use only Node.js (works on all systems)
