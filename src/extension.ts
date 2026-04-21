@@ -120,11 +120,13 @@ export function activate(context: vscode.ExtensionContext) {
     itemSevenDay.show();
   }
 
-  function fetchAndRefresh() {
-    itemFiveHour.text = '$(sync~spin) Обновление...';
-    itemSevenDay.text = '';
-    itemFiveHour.show();
-    itemSevenDay.show();
+  function fetchAndRefresh(showSpinner = false) {
+    if (showSpinner) {
+      itemFiveHour.text = '$(sync~spin) Обновление...';
+      itemSevenDay.text = '';
+      itemFiveHour.show();
+      itemSevenDay.show();
+    }
 
     const credsPath = path.join(CLAUDE_DIR, '.credentials.json');
     let token: string;
@@ -159,12 +161,12 @@ export function activate(context: vscode.ExtensionContext) {
     req.on('error', () => refresh());
   }
 
-  context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.refresh', fetchAndRefresh));
+  context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.refresh', () => fetchAndRefresh(true)));
 
   fs.watchFile(LIMITS_FILE, { interval: 1000 }, refresh);
   context.subscriptions.push({ dispose: () => fs.unwatchFile(LIMITS_FILE) });
 
-  const timer = setInterval(refresh, 60_000);
+  const timer = setInterval(fetchAndRefresh, 60_000);
   context.subscriptions.push({ dispose: () => clearInterval(timer) });
 
   refresh();
