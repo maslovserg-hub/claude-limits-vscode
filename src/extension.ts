@@ -41,9 +41,11 @@ https.get({
   res.on('end', () => {
     try {
       const d = JSON.parse(data);
+      if (d.error || res.statusCode !== 200) return;
+      if (typeof d.five_hour?.utilization !== 'number' || typeof d.seven_day?.utilization !== 'number') return;
       const out = {
-        five_hour: { used_percentage: d.five_hour?.utilization || 0, resets_at: d.five_hour?.resets_at || null },
-        seven_day: { used_percentage: d.seven_day?.utilization || 0, resets_at: d.seven_day?.resets_at || null }
+        five_hour: { used_percentage: d.five_hour.utilization, resets_at: d.five_hour.resets_at || null },
+        seven_day: { used_percentage: d.seven_day.utilization, resets_at: d.seven_day.resets_at || null }
       };
       fs.writeFileSync(path.join(os.homedir(), '.claude', 'limits.json'), JSON.stringify(out));
     } catch(e) {}
@@ -149,11 +151,14 @@ export function activate(context: vscode.ExtensionContext) {
       res.on('end', () => {
         try {
           const d = JSON.parse(data);
-          const out = {
-            five_hour: { used_percentage: d.five_hour?.utilization || 0, resets_at: d.five_hour?.resets_at || null },
-            seven_day: { used_percentage: d.seven_day?.utilization || 0, resets_at: d.seven_day?.resets_at || null }
-          };
-          fs.writeFileSync(LIMITS_FILE, JSON.stringify(out));
+          if (!d.error && res.statusCode === 200 &&
+              typeof d.five_hour?.utilization === 'number' && typeof d.seven_day?.utilization === 'number') {
+            const out = {
+              five_hour: { used_percentage: d.five_hour.utilization, resets_at: d.five_hour.resets_at || null },
+              seven_day: { used_percentage: d.seven_day.utilization, resets_at: d.seven_day.resets_at || null }
+            };
+            fs.writeFileSync(LIMITS_FILE, JSON.stringify(out));
+          }
         } catch {}
         refresh();
       });

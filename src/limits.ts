@@ -16,13 +16,11 @@ export function parseLimits(jsonStr: string): LimitsData | null {
     const fhResetsAt: string | undefined = data.five_hour?.resets_at;
     const sdResetsAt: string | undefined = data.seven_day?.resets_at;
     const now = Date.now();
-    if (fhResetsAt && new Date(fhResetsAt).getTime() <= now) fh = 0;
-    if (sdResetsAt && new Date(sdResetsAt).getTime() <= now) sd = 0;
     return {
       fiveHour: fh,
       sevenDay: sd,
-      fiveHourResetsAt: fh > 0 ? fhResetsAt : undefined,
-      sevenDayResetsAt: sd > 0 ? sdResetsAt : undefined,
+      fiveHourResetsAt: fhResetsAt && new Date(fhResetsAt).getTime() > now ? fhResetsAt : undefined,
+      sevenDayResetsAt: sdResetsAt && new Date(sdResetsAt).getTime() > now ? sdResetsAt : undefined,
     };
   } catch {
     return null;
