@@ -23,7 +23,7 @@ export function parseLimits(jsonStr: string): LimitsData | null {
     return {
       fiveHour: fh,
       sevenDay: sd,
-      sevenDaySonnet: typeof sdsPct === 'number' ? sdsPct : undefined,
+      sevenDaySonnet: typeof sdsPct === 'number' && sdsPct > 0 ? sdsPct : undefined,
       fiveHourResetsAt: fhResetsAt && new Date(fhResetsAt).getTime() > now ? fhResetsAt : undefined,
       sevenDayResetsAt: sdResetsAt && new Date(sdResetsAt).getTime() > now ? sdResetsAt : undefined,
       sevenDaySonnetResetsAt: sdsResetsAt && new Date(sdsResetsAt).getTime() > now ? sdsResetsAt : undefined,
@@ -80,8 +80,7 @@ export function formatSevenDaySonnetText(limits: LimitsData): string | null {
   if (typeof limits.sevenDaySonnet !== 'number') return null;
   const bar = formatProgressBar(limits.sevenDaySonnet);
   const emoji = getStatusEmoji(limits.sevenDaySonnet);
-  const time = limits.sevenDaySonnetResetsAt ? ` (~${formatTimeRemaining(limits.sevenDaySonnetResetsAt)})` : '';
-  return `Sonnet: ${bar} ${emoji}${limits.sevenDaySonnet}%${time}`;
+  return `Sonnet: ${bar} ${emoji}${limits.sevenDaySonnet}%`;
 }
 
 export function formatStatusText(limits: LimitsData): string {

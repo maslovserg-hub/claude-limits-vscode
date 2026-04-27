@@ -37,6 +37,16 @@ describe('parseLimits', () => {
     const result = parseLimits(JSON.stringify(json));
     expect(result?.sevenDaySonnet).toBeUndefined();
   });
+
+  it('omits sevenDaySonnet when utilization is 0', () => {
+    const json = {
+      five_hour: { used_percentage: 10 },
+      seven_day: { used_percentage: 20 },
+      seven_day_sonnet: { used_percentage: 0 }
+    };
+    const result = parseLimits(JSON.stringify(json));
+    expect(result?.sevenDaySonnet).toBeUndefined();
+  });
 });
 
 describe('formatProgressBar', () => {
@@ -146,7 +156,8 @@ describe('formatSevenDaySonnetText', () => {
     expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0, sevenDaySonnet: 25 })).toBe('Sonnet: ██░░░░ 25%');
   });
 
-  it('formats Sonnet line with yellow circle in warning range', () => {
-    expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0, sevenDaySonnet: 65 })).toBe('Sonnet: ████░░ 🟡65%');
+  it('formats Sonnet line with yellow circle and no time', () => {
+    const limits = { fiveHour: 0, sevenDay: 0, sevenDaySonnet: 65, sevenDaySonnetResetsAt: '2099-01-01T00:00:00Z' };
+    expect(formatSevenDaySonnetText(limits)).toBe('Sonnet: ████░░ 🟡65%');
   });
 });
