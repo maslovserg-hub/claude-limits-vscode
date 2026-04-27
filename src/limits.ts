@@ -1,8 +1,10 @@
 export interface LimitsData {
   fiveHour: number;
   sevenDay: number;
+  sevenDaySonnet?: number;
   fiveHourResetsAt?: string;
   sevenDayResetsAt?: string;
+  sevenDaySonnetResetsAt?: string;
 }
 
 const BAR_WIDTH = 6;
@@ -15,12 +17,16 @@ export function parseLimits(jsonStr: string): LimitsData | null {
     if (typeof fh !== 'number' || typeof sd !== 'number') return null;
     const fhResetsAt: string | undefined = data.five_hour?.resets_at;
     const sdResetsAt: string | undefined = data.seven_day?.resets_at;
+    const sdsPct = data?.seven_day_sonnet?.used_percentage;
+    const sdsResetsAt: string | undefined = data?.seven_day_sonnet?.resets_at;
     const now = Date.now();
     return {
       fiveHour: fh,
       sevenDay: sd,
+      sevenDaySonnet: typeof sdsPct === 'number' ? sdsPct : undefined,
       fiveHourResetsAt: fhResetsAt && new Date(fhResetsAt).getTime() > now ? fhResetsAt : undefined,
       sevenDayResetsAt: sdResetsAt && new Date(sdResetsAt).getTime() > now ? sdResetsAt : undefined,
+      sevenDaySonnetResetsAt: sdsResetsAt && new Date(sdsResetsAt).getTime() > now ? sdsResetsAt : undefined,
     };
   } catch {
     return null;
@@ -38,6 +44,12 @@ export function getColor(pct: number): 'green' | 'yellow' | 'red' {
   return 'green';
 }
 
+export function getStatusEmoji(pct: number): string {
+  if (pct >= 80) return '🔴';
+  if (pct >= 60) return '🟡';
+  return '';
+}
+
 export function formatTimeRemaining(resetsAt: string): string {
   const diff = new Date(resetsAt).getTime() - Date.now();
   if (diff <= 0) return '';
@@ -52,16 +64,28 @@ export function formatTimeRemaining(resetsAt: string): string {
 
 export function formatFiveHourText(limits: LimitsData): string {
   const bar = formatProgressBar(limits.fiveHour);
+  const emoji = getStatusEmoji(limits.fiveHour);
   const time = limits.fiveHourResetsAt ? ` (~${formatTimeRemaining(limits.fiveHourResetsAt)})` : '';
-  return `Сессия: ${bar} ${limits.fiveHour}%${time}`;
+  return `Сессия: ${bar} ${emoji}${limits.fiveHour}%${time}`;
 }
 
 export function formatSevenDayText(limits: LimitsData): string {
   const bar = formatProgressBar(limits.sevenDay);
+  const emoji = getStatusEmoji(limits.sevenDay);
   const time = limits.sevenDayResetsAt ? ` (~${formatTimeRemaining(limits.sevenDayResetsAt)})` : '';
-  return `Неделя: ${bar} ${limits.sevenDay}%${time}`;
+  return `Неделя: ${bar} ${emoji}${limits.sevenDay}%${time}`;
+}
+
+export function formatSevenDaySonnetText(limits: LimitsData): string | null {
+  if (typeof limits.sevenDaySonnet !== 'number') return null;
+  const bar = formatProgressBar(limits.sevenDaySonnet);
+  const emoji = getStatusEmoji(limits.sevenDaySonnet);
+  const time = limits.sevenDaySonnetResetsAt ? ` (~${formatTimeRemaining(limits.sevenDaySonnetResetsAt)})` : '';
+  return `Sonnet: ${bar} ${emoji}${limits.sevenDaySonnet}%${time}`;
 }
 
 export function formatStatusText(limits: LimitsData): string {
-  return `${formatFiveHourText(limits)} | ${formatSevenDayText(limits)}`;
+  const sonnet = formatSevenDaySonnetText(limits);
+  const base = `${formatFiveHourText(limits)} | ${formatSevenDayText(limits)}`;
+  return sonnet ? `${base} | ${sonnet}` : base;
 }

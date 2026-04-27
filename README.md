@@ -1,18 +1,19 @@
 # Claude Limits Monitor
 
-Displays your **Claude Code rate limit usage** directly in the VS Code status bar — session and weekly limits, progress bars, time-to-reset countdown, and color alerts. No extra API overhead during normal use.
+Displays your **Claude Code rate limit usage** directly in the VS Code status bar — 5-hour session, weekly all-models limit, and (on Max plan) weekly Sonnet limit. Single status bar item with visual progress bars and warning indicators.
 
 ---
 
 ## Features
 
-- **Dual status bar items** — session (5-hour) and weekly (7-day) limits shown side by side
+- **Single grouped status bar item** — all three indicators stay together; other extensions can't split them
+- **Three limits in one place** — 5-hour session, 7-day weekly (all models), 7-day weekly Sonnet only (Max plan)
 - **Visual progress bar** — 6-segment `██████░░` bar for an instant read on usage
-- **Color alerts** — green → yellow at 50% → red at 80%
+- **Warning circles** — 🟡 appears at 60–79% usage, 🔴 at 80%+; below 60% there's no clutter
 - **Reset countdown** — shows time remaining (`~2h`, `~3d12h`) until the limit window resets
-- **Auto-clear on reset** — if the reset time has already passed, usage drops to 0% automatically without waiting for the next Claude response
+- **Auto-hide Sonnet block** — third indicator only appears when the API returns Sonnet limit data (Max plan)
 - **Periodic refresh** — status updates every 60 seconds even when Claude is idle
-- **Click to refresh** — click either status bar item to force an immediate update
+- **Click to refresh** — click the status bar item to force an immediate API fetch
 - **Cross-platform** — works on Windows, macOS, and Linux
 
 ---
@@ -38,24 +39,25 @@ No API calls are made by the extension itself. All data comes from the hook.
 ## Status Bar Format
 
 ```
-Сессия: ████░░ 42% (~2h)   |   Неделя: ██░░░░ 18%
+Сессия: ████░░ 42% (~2ч) | Неделя: ██░░░░ 🟡65% | Sonnet: █████░ 🔴85%
 ```
 
 | Element | Meaning |
 |---|---|
 | `Сессия` | 5-hour rolling session window |
-| `Неделя` | 7-day weekly window |
+| `Неделя` | 7-day weekly window (all models) |
+| `Sonnet` | 7-day weekly Sonnet-only limit (Max plan only — appears when API returns it) |
 | `████░░` | Filled segments out of 6 total |
 | `42%` | Current utilization percentage |
-| `(~2h)` | Time remaining until reset |
+| `(~2ч)` | Time remaining until reset |
 
-Status bar color changes with usage level:
+Warning circles appear next to the percentage:
 
-| Usage | Color |
+| Usage | Indicator |
 |---|---|
-| < 50% | Default (white) |
-| 50–79% | Orange tint |
-| ≥ 80% | Red |
+| < 60% | (none — bar + percentage only) |
+| 60–79% | 🟡 yellow circle |
+| ≥ 80% | 🔴 red circle |
 
 ---
 
@@ -114,48 +116,17 @@ On **Windows**, use the full path:
 |---|---|
 | `Claude Limits: Refresh` | Force-read `limits.json` and update status bar immediately |
 
-Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) or by clicking either status bar item.
+Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) or by clicking the status bar item.
 
 ---
 
 ## Known Limitations
 
-- Limits update only after a Claude Code session ends (Stop hook trigger), not in real time
+- Background refresh runs every 60 seconds; for instant update click the status bar item
 - Requires Claude Code CLI — does not work with the Claude web interface alone
 - OAuth token is read from `~/.claude/.credentials.json`; if Claude Code changes its credential storage, the hook may need updating
+- Sonnet weekly indicator appears only on plans where the API exposes it (Max); on Pro it's hidden
 
 ---
 
-## Release Notes
-
-### 0.1.8
-- **Fixed click-to-refresh** — extension now makes the HTTP request directly (no bash), spinner is visible during actual API wait
-
-### 0.1.7
-- **Click to refresh** — clicking the status bar item triggers a live API fetch and shows a spinner while loading
-
-### 0.1.6
-- Version bump to republish with updated release notes
-
-### 0.1.5
-- **Auto-setup on install** — extension now automatically creates the hook script and registers it in `~/.claude/settings.json`; no manual configuration needed
-- **No `jq` dependency** — hook script rewritten to use only Node.js (works on all systems)
-
-### 0.1.4
-- Switched to `icon.png`
-- Version bump
-
-### 0.1.3
-- Auto-reset: usage drops to 0% when `resets_at` timestamp is in the past
-- Added 60-second periodic refresh timer (status updates even when file is unchanged)
-
-### 0.1.2
-- Split status bar into two separate items (session / weekly)
-- Added reset countdown display
-
-### 0.1.1
-- Added color alerts (green / yellow / red)
-- Progress bar visualization
-
-### 0.1.0
-- Initial release
+Release history is in [CHANGELOG.md](CHANGELOG.md).

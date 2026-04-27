@@ -3,14 +3,13 @@ import * as fs from 'fs';
 import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
-import { parseLimits, formatFiveHourText, formatSevenDayText } from './limits';
+import { parseLimits, formatStatusText } from './limits';
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const LIMITS_FILE = path.join(CLAUDE_DIR, 'limits.json');
 const HOOKS_DIR = path.join(CLAUDE_DIR, 'hooks');
 const HOOK_SCRIPT = path.join(HOOKS_DIR, 'save-limits.sh');
 const CLAUDE_SETTINGS = path.join(CLAUDE_DIR, 'settings.json');
-const COLOR_EXCEEDED = '#D4875A';
 
 const HOOK_CONTENT = `#!/usr/bin/env bash
 # Claude Limits Monitor: fetches rate limits after each response
@@ -47,6 +46,9 @@ https.get({
         five_hour: { used_percentage: d.five_hour.utilization, resets_at: d.five_hour.resets_at || null },
         seven_day: { used_percentage: d.seven_day.utilization, resets_at: d.seven_day.resets_at || null }
       };
+      if (typeof d.seven_day_sonnet?.utilization === 'number') {
+        out.seven_day_sonnet = { used_percentage: d.seven_day_sonnet.utilization, resets_at: d.seven_day_sonnet.resets_at || null };
+      }
       fs.writeFileSync(path.join(os.homedir(), '.claude', 'limits.json'), JSON.stringify(out));
     } catch(e) {}
   });
@@ -85,49 +87,31 @@ function ensureHookSetup(): boolean {
 export function activate(context: vscode.ExtensionContext) {
   ensureHookSetup();
 
-  const itemFiveHour = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
-  itemFiveHour.command = 'claudeLimits.refresh';
-  itemFiveHour.tooltip = 'Claude: 5-hour session limit';
+  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  item.command = 'claudeLimits.refresh';
+  item.tooltip = 'Claude Limits — клик для обновления';
 
-  const itemSevenDay = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  itemSevenDay.command = 'claudeLimits.refresh';
-  itemSevenDay.tooltip = 'Claude: 7-day weekly limit';
-
-  context.subscriptions.push(itemFiveHour, itemSevenDay);
+  context.subscriptions.push(item);
 
   function refresh() {
     try {
       const content = fs.readFileSync(LIMITS_FILE, 'utf8');
       const limits = parseLimits(content);
       if (limits) {
-        itemFiveHour.text = formatFiveHourText(limits);
-        itemFiveHour.color = limits.fiveHour >= 80 ? COLOR_EXCEEDED : undefined;
-        itemSevenDay.text = formatSevenDayText(limits);
-        itemSevenDay.color = limits.sevenDay >= 80 ? COLOR_EXCEEDED : undefined;
+        item.text = formatStatusText(limits);
       } else {
-        itemFiveHour.text = 'Claude Сессия: N/A';
-        itemSevenDay.text = 'Claude Неделя: N/A';
-        itemFiveHour.color = undefined;
-        itemSevenDay.color = undefined;
+        item.text = 'Claude Limits: N/A';
       }
     } catch {
-      itemFiveHour.text = 'Claude: no data';
-      itemSevenDay.text = '';
-      itemFiveHour.color = undefined;
-      itemSevenDay.color = undefined;
+      item.text = 'Claude Limits: no data';
     }
-    itemFiveHour.backgroundColor = undefined;
-    itemSevenDay.backgroundColor = undefined;
-    itemFiveHour.show();
-    itemSevenDay.show();
+    item.show();
   }
 
   function fetchAndRefresh(showSpinner = false) {
     if (showSpinner) {
-      itemFiveHour.text = '$(sync~spin) Обновление...';
-      itemSevenDay.text = '';
-      itemFiveHour.show();
-      itemSevenDay.show();
+      item.text = '$(sync~spin) Claude Limits: обновление...';
+      item.show();
     }
 
     const credsPath = path.join(CLAUDE_DIR, '.credentials.json');
@@ -153,10 +137,13 @@ export function activate(context: vscode.ExtensionContext) {
           const d = JSON.parse(data);
           if (!d.error && res.statusCode === 200 &&
               typeof d.five_hour?.utilization === 'number' && typeof d.seven_day?.utilization === 'number') {
-            const out = {
+            const out: Record<string, unknown> = {
               five_hour: { used_percentage: d.five_hour.utilization, resets_at: d.five_hour.resets_at || null },
               seven_day: { used_percentage: d.seven_day.utilization, resets_at: d.seven_day.resets_at || null }
             };
+            if (typeof d.seven_day_sonnet?.utilization === 'number') {
+              out.seven_day_sonnet = { used_percentage: d.seven_day_sonnet.utilization, resets_at: d.seven_day_sonnet.resets_at || null };
+            }
             fs.writeFileSync(LIMITS_FILE, JSON.stringify(out));
           }
         } catch {}

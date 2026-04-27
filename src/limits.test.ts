@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseLimits, formatProgressBar, getColor, formatStatusText } from './limits';
+import { parseLimits, formatProgressBar, getColor, getStatusEmoji, formatStatusText, formatSevenDaySonnetText } from './limits';
 
 describe('parseLimits', () => {
   it('parses valid JSON with both limits', () => {
@@ -17,6 +17,25 @@ describe('parseLimits', () => {
 
   it('returns null for missing fields', () => {
     expect(parseLimits('{}')).toBeNull();
+  });
+
+  it('parses seven_day_sonnet when present', () => {
+    const json = {
+      five_hour: { used_percentage: 10 },
+      seven_day: { used_percentage: 20 },
+      seven_day_sonnet: { used_percentage: 5 }
+    };
+    const result = parseLimits(JSON.stringify(json));
+    expect(result?.sevenDaySonnet).toBe(5);
+  });
+
+  it('omits sevenDaySonnet when seven_day_sonnet missing', () => {
+    const json = {
+      five_hour: { used_percentage: 10 },
+      seven_day: { used_percentage: 20 }
+    };
+    const result = parseLimits(JSON.stringify(json));
+    expect(result?.sevenDaySonnet).toBeUndefined();
   });
 });
 
@@ -60,14 +79,74 @@ describe('getColor', () => {
   });
 });
 
+describe('getStatusEmoji', () => {
+  it('returns empty string for low usage', () => {
+    expect(getStatusEmoji(30)).toBe('');
+  });
+
+  it('returns empty just below threshold', () => {
+    expect(getStatusEmoji(59)).toBe('');
+  });
+
+  it('returns yellow circle at exactly 60%', () => {
+    expect(getStatusEmoji(60)).toBe('🟡');
+  });
+
+  it('returns yellow circle at 79%', () => {
+    expect(getStatusEmoji(79)).toBe('🟡');
+  });
+
+  it('returns red circle at exactly 80%', () => {
+    expect(getStatusEmoji(80)).toBe('🔴');
+  });
+
+  it('returns red circle for high usage', () => {
+    expect(getStatusEmoji(95)).toBe('🔴');
+  });
+});
+
 describe('formatStatusText', () => {
-  it('formats both limits with progress bars', () => {
+  it('shows no emoji below 60%', () => {
     const result = formatStatusText({ fiveHour: 50, sevenDay: 25 });
     expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25%');
   });
 
-  it('handles 0% values', () => {
+  it('handles 0% values without emoji', () => {
     const result = formatStatusText({ fiveHour: 0, sevenDay: 0 });
     expect(result).toBe('Сессия: ░░░░░░ 0% | Неделя: ░░░░░░ 0%');
+  });
+
+  it('shows yellow circle in 60-79% range', () => {
+    const result = formatStatusText({ fiveHour: 65, sevenDay: 25 });
+    expect(result).toBe('Сессия: ████░░ 🟡65% | Неделя: ██░░░░ 25%');
+  });
+
+  it('shows red circle at 80%+', () => {
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 85 });
+    expect(result).toBe('Сессия: ███░░░ 50% | Неделя: █████░ 🔴85%');
+  });
+
+  it('appends Sonnet block when sevenDaySonnet is present', () => {
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 85 });
+    expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25% | Sonnet: █████░ 🔴85%');
+  });
+
+  it('does not append Sonnet block when missing', () => {
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25 });
+    expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25%');
+  });
+});
+
+describe('formatSevenDaySonnetText', () => {
+  it('returns null when sevenDaySonnet is undefined', () => {
+    expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0 })).toBeNull();
+  });
+
+  it('formats Sonnet line without emoji when below 60%', () => {
+    expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0, sevenDaySonnet: 25 })).toBe('Sonnet: ██░░░░ 25%');
+  });
+
+  it('formats Sonnet line with yellow circle in warning range', () => {
+    expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0, sevenDaySonnet: 65 })).toBe('Sonnet: ████░░ 🟡65%');
   });
 });
