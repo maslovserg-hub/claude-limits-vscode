@@ -138,12 +138,17 @@ describe('formatStatusText', () => {
 
   it('appends Sonnet block when sevenDaySonnet is present', () => {
     const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 85 });
-    expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25% | Sonnet: █████░ 🔴85%');
+    expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25% | S: 🔴85%');
   });
 
   it('does not append Sonnet block when missing', () => {
     const result = formatStatusText({ fiveHour: 50, sevenDay: 25 });
     expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25%');
+  });
+
+  it('shows Sonnet without emoji below 60%', () => {
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 10 });
+    expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25% | S: 10%');
   });
 });
 
@@ -152,12 +157,16 @@ describe('formatSevenDaySonnetText', () => {
     expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0 })).toBeNull();
   });
 
-  it('formats Sonnet line without emoji when below 60%', () => {
-    expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0, sevenDaySonnet: 25 })).toBe('Sonnet: ██░░░░ 25%');
+  it('formats Sonnet without emoji when below 60%', () => {
+    expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0, sevenDaySonnet: 25 })).toBe('S: 25%');
   });
 
-  it('formats Sonnet line with yellow circle and no time', () => {
+  it('formats Sonnet with yellow circle at 65%', () => {
     const limits = { fiveHour: 0, sevenDay: 0, sevenDaySonnet: 65, sevenDaySonnetResetsAt: '2099-01-01T00:00:00Z' };
-    expect(formatSevenDaySonnetText(limits)).toBe('Sonnet: ████░░ 🟡65%');
+    expect(formatSevenDaySonnetText(limits)).toBe('S: 🟡65%');
+  });
+
+  it('formats Sonnet with red circle at 80%+', () => {
+    expect(formatSevenDaySonnetText({ fiveHour: 0, sevenDay: 0, sevenDaySonnet: 85 })).toBe('S: 🔴85%');
   });
 });

@@ -78,13 +78,13 @@ export function formatSevenDayText(limits: LimitsData): string {
 
 export function formatSevenDaySonnetText(limits: LimitsData): string | null {
   if (typeof limits.sevenDaySonnet !== 'number') return null;
-  const bar = formatProgressBar(limits.sevenDaySonnet);
   const emoji = getStatusEmoji(limits.sevenDaySonnet);
-  return `Sonnet: ${bar} ${emoji}${limits.sevenDaySonnet}%`;
+  return `S: ${emoji}${limits.sevenDaySonnet}%`;
 }
 
 export function formatStatusText(limits: LimitsData): string {
-  const sonnet = formatSevenDaySonnetText(limits);
   const base = `${formatFiveHourText(limits)} | ${formatSevenDayText(limits)}`;
-  return sonnet ? `${base} | ${sonnet}` : base;
+  const sonnet = formatSevenDaySonnetText(limits);
+  if (!sonnet) return base;
+  return `${base} | ${sonnet}`;
 }

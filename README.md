@@ -8,10 +8,10 @@ Displays your **Claude Code rate limit usage** directly in the VS Code status ba
 
 - **Single grouped status bar item** — all three indicators stay together; other extensions can't split them
 - **Three limits in one place** — 5-hour session, 7-day weekly (all models), 7-day weekly Sonnet only (Max plan)
-- **Visual progress bar** — 6-segment `██████░░` bar for an instant read on usage
+- **Visual progress bar** — 6-segment `██████░░` bar for session and weekly; Sonnet shown as compact `S: 🔴85%`
 - **Warning circles** — 🟡 appears at 60–79% usage, 🔴 at 80%+; below 60% there's no clutter
 - **Reset countdown** — shows time remaining (`~2h`, `~3d12h`) until the limit window resets
-- **Auto-hide Sonnet block** — third indicator only appears when the API returns Sonnet limit data (Max plan)
+- **Auto-hide Sonnet block** — compact `S:` indicator only appears when the API returns Sonnet limit data (Max plan)
 - **Periodic refresh** — status updates every 60 seconds even when Claude is idle
 - **Click to refresh** — click the status bar item to force an immediate API fetch
 - **Cross-platform** — works on Windows, macOS, and Linux
@@ -39,14 +39,14 @@ No API calls are made by the extension itself. All data comes from the hook.
 ## Status Bar Format
 
 ```
-Сессия: ████░░ 42% (~2ч) | Неделя: ██░░░░ 🟡65% | Sonnet: █████░ 🔴85%
+Сессия: ████░░ 42% (~2ч) | Неделя: ██░░░░ 🟡65% | S: 🔴85%
 ```
 
 | Element | Meaning |
 |---|---|
 | `Сессия` | 5-hour rolling session window |
 | `Неделя` | 7-day weekly window (all models) |
-| `Sonnet` | 7-day weekly Sonnet-only limit (Max plan only — appears when API returns it) |
+| `S:` | 7-day weekly Sonnet-only limit (Max plan only — appears when API returns it) |
 | `████░░` | Filled segments out of 6 total |
 | `42%` | Current utilization percentage |
 | `(~2ч)` | Time remaining until reset |

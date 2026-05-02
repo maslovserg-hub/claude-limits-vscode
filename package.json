@@ -2,7 +2,7 @@
   "name": "claude-limits",
   "displayName": "Claude Limits Monitor",
   "description": "Shows Claude Code rate limits in VSCode status bar",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "publisher": "maslovserg",
   "icon": "icon.png",
   "repository": {
@@ -25,7 +25,11 @@
         "command": "claudeLimits.refresh",
         "title": "Claude Limits: Refresh"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Claude Limits",
+      "properties": {}
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
