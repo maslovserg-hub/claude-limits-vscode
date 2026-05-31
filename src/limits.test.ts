@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseLimits, formatProgressBar, getColor, getStatusEmoji, formatStatusText, formatSevenDaySonnetText } from './limits';
 
+
 describe('parseLimits', () => {
   it('parses valid JSON with both limits', () => {
     const json = {
@@ -116,39 +117,49 @@ describe('getStatusEmoji', () => {
 });
 
 describe('formatStatusText', () => {
-  it('shows no emoji below 60%', () => {
+  it('shows no emoji below 60% (en)', () => {
     const result = formatStatusText({ fiveHour: 50, sevenDay: 25 });
+    expect(result).toBe('Session: ███░░░ 50% | Week: ██░░░░ 25%');
+  });
+
+  it('shows no emoji below 60% (ru)', () => {
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25 }, 'ru');
     expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25%');
   });
 
   it('handles 0% values without emoji', () => {
-    const result = formatStatusText({ fiveHour: 0, sevenDay: 0 });
+    const result = formatStatusText({ fiveHour: 0, sevenDay: 0 }, 'ru');
     expect(result).toBe('Сессия: ░░░░░░ 0% | Неделя: ░░░░░░ 0%');
   });
 
   it('shows yellow circle in 60-79% range', () => {
-    const result = formatStatusText({ fiveHour: 65, sevenDay: 25 });
+    const result = formatStatusText({ fiveHour: 65, sevenDay: 25 }, 'ru');
     expect(result).toBe('Сессия: ████░░ 🟡65% | Неделя: ██░░░░ 25%');
   });
 
   it('shows red circle at 80%+', () => {
-    const result = formatStatusText({ fiveHour: 50, sevenDay: 85 });
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 85 }, 'ru');
     expect(result).toBe('Сессия: ███░░░ 50% | Неделя: █████░ 🔴85%');
   });
 
   it('appends Sonnet block when sevenDaySonnet is present', () => {
-    const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 85 });
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 85 }, 'ru');
     expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25% | S: 🔴85%');
   });
 
   it('does not append Sonnet block when missing', () => {
-    const result = formatStatusText({ fiveHour: 50, sevenDay: 25 });
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25 }, 'ru');
     expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25%');
   });
 
   it('shows Sonnet without emoji below 60%', () => {
-    const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 10 });
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 10 }, 'ru');
     expect(result).toBe('Сессия: ███░░░ 50% | Неделя: ██░░░░ 25% | S: 10%');
+  });
+
+  it('uses English labels with Sonnet block', () => {
+    const result = formatStatusText({ fiveHour: 50, sevenDay: 25, sevenDaySonnet: 85 }, 'en');
+    expect(result).toBe('Session: ███░░░ 50% | Week: ██░░░░ 25% | S: 🔴85%');
   });
 });
 

@@ -62,18 +62,25 @@ export function formatTimeRemaining(resetsAt: string): string {
   return remHours > 0 ? `${days}д${remHours}ч` : `${days}д`;
 }
 
-export function formatFiveHourText(limits: LimitsData): string {
+export type Lang = 'ru' | 'en';
+
+const LABELS: Record<Lang, { session: string; week: string }> = {
+  ru: { session: 'Сессия', week: 'Неделя' },
+  en: { session: 'Session', week: 'Week' },
+};
+
+export function formatFiveHourText(limits: LimitsData, lang: Lang = 'en'): string {
   const bar = formatProgressBar(limits.fiveHour);
   const emoji = getStatusEmoji(limits.fiveHour);
   const time = limits.fiveHourResetsAt ? ` (~${formatTimeRemaining(limits.fiveHourResetsAt)})` : '';
-  return `Сессия: ${bar} ${emoji}${limits.fiveHour}%${time}`;
+  return `${LABELS[lang].session}: ${bar} ${emoji}${limits.fiveHour}%${time}`;
 }
 
-export function formatSevenDayText(limits: LimitsData): string {
+export function formatSevenDayText(limits: LimitsData, lang: Lang = 'en'): string {
   const bar = formatProgressBar(limits.sevenDay);
   const emoji = getStatusEmoji(limits.sevenDay);
   const time = limits.sevenDayResetsAt ? ` (~${formatTimeRemaining(limits.sevenDayResetsAt)})` : '';
-  return `Неделя: ${bar} ${emoji}${limits.sevenDay}%${time}`;
+  return `${LABELS[lang].week}: ${bar} ${emoji}${limits.sevenDay}%${time}`;
 }
 
 export function formatSevenDaySonnetText(limits: LimitsData): string | null {
@@ -82,8 +89,8 @@ export function formatSevenDaySonnetText(limits: LimitsData): string | null {
   return `S: ${emoji}${limits.sevenDaySonnet}%`;
 }
 
-export function formatStatusText(limits: LimitsData): string {
-  const base = `${formatFiveHourText(limits)} | ${formatSevenDayText(limits)}`;
+export function formatStatusText(limits: LimitsData, lang: Lang = 'en'): string {
+  const base = `${formatFiveHourText(limits, lang)} | ${formatSevenDayText(limits, lang)}`;
   const sonnet = formatSevenDaySonnetText(limits);
   if (!sonnet) return base;
   return `${base} | ${sonnet}`;

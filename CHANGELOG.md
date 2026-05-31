@@ -1,30 +1,55 @@
 # Changelog
 
+## [0.3.0]
+- **Switch account button** — new account icon appears right next to the limits indicator; click triggers the Claude Code login screen (logout + open sidebar)
+- **Account in tooltip** — hovering over either the limits item or the switch button shows the active account name and email; fetched live from `/api/oauth/profile` so it always reflects the current session
+- **Show/hide switch button** — new setting `claudeLimits.showSwitchAccount` (default: on); uncheck in VS Code Settings to hide the button if you use a single account
+
+## [0.2.9]
+- **Account in tooltip** — hovering over the status bar now shows the active Claude account (name + email) below the refresh hint
+
+## [0.2.8]
+- **Language setting** — new `Claude Limits: Language` option (`ru` / `en`). English is the default: status bar shows `Session` / `Week`; switch to `ru` for Russian labels. Applies instantly without restarting VS Code
+- Tooltip and refresh spinner text also respect the language setting
+- One-time hint on first install: notifies the user that Russian labels are available, with an "Open Settings" button
+- Fixed marketplace description: updated status bar format, added missing versions [0.2.6] and [0.1.9], corrected "How It Works" section
+
+## [0.2.7]
+- **Language setting** — new `Claude Limits: Language` option (`ru` / `en`). With `en`, the status bar shows `Session` and `Week` instead of Russian labels. Applies instantly without restarting VS Code
+- Fixed marketplace description: updated status bar format, added missing versions [0.2.6] and [0.1.9], corrected "How It Works" section
+
+## [0.2.6]
+- **Compact Sonnet block** — displayed as `S: 🔴85%` with no progress bar; progress bar is shown only for Session and Week
+
 ## [0.2.5]
-- Блок Sonnet скрывается при 0% — появляется только когда накопится реальное использование
-- Время до сброса в блоке Sonnet убрано — оно уже показывается в блоке «Неделя»
+- Sonnet block hidden at 0% — appears only when actual usage accumulates
+- Reset countdown removed from Sonnet block — it is already shown in the Week block
 
 ## [0.2.4]
-- **Кружки-индикаторы появляются только при риске** — ниже 60% статус-бар чистый (бар + цифра), 🟡 в диапазоне 60–79%, 🔴 от 80%. Зелёный кружок убран.
-- README обновлён под текущий формат, секция Release Notes удалена (история теперь только в CHANGELOG)
+- **Warning circles appear only when at risk** — below 60% the status bar is clean (bar + number only), 🟡 at 60–79%, 🔴 at 80%+; green circle removed
+- README updated to match current format; Release Notes section removed (history is now in CHANGELOG only)
 
 ## [0.2.3]
-- Кружки заменены на 🟡 / 🔴, перенесены вплотную к цифре процента
+- Circles replaced with 🟡 / 🔴 and moved right next to the percentage number
 
 ## [0.2.2]
-- Все три индикатора объединены в **один статус-бар-айтем** — другие расширения больше не разрывают группу. Цвет каждого лимита показывается через цветной квадрат рядом с прогресс-баром
+- All three indicators merged into a **single status bar item** — other extensions can no longer split the group
 
 ## [0.2.1]
-- Добавлен **третий индикатор** — недельный лимит только для Sonnet (Max-план). Появляется автоматически, когда API возвращает поле `seven_day_sonnet`
+- Added **third indicator** — weekly Sonnet-only limit (Max plan). Appears automatically when the API returns the `seven_day_sonnet` field
 
 ## [0.2.0]
-- **Исправлен показ 0%** — убрана логика обнуления при устаревшем `resets_at`; теперь всегда отображается реальное значение из API
+- **Fixed zero display** — removed the logic that reset usage to 0% when `resets_at` was in the past; the real API value is always shown now
+
+## [0.1.9]
+- **Background API polling** — extension calls the Anthropic API directly every 60 seconds, independent of the hook
+- Spinner shown only on manual click; background refresh is silent
 
 ## [0.1.8]
-- **Исправлен клик-рефреш** — расширение теперь делает HTTP-запрос напрямую (без bash), спиннер виден во время реального ожидания ответа API
+- **Fixed click-refresh** — extension now makes the HTTP request directly (no bash), spinner is visible during the actual API wait
 
 ## [0.1.7]
-- **Клик по индикатору обновляет данные** — тап по статус-бару запускает запрос к API и показывает спиннер во время загрузки
+- **Click to refresh** — clicking the status bar item triggers a live API request and shows a spinner while loading
 
 ## [0.1.6]
 - Version bump to republish with updated release notes

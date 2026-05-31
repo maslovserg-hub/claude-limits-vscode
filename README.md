@@ -12,6 +12,9 @@ Displays your **Claude Code rate limit usage** directly in the VS Code status ba
 - **Warning circles** — 🟡 appears at 60–79% usage, 🔴 at 80%+; below 60% there's no clutter
 - **Reset countdown** — shows time remaining (`~2h`, `~3d12h`) until the limit window resets
 - **Auto-hide Sonnet block** — compact `S:` indicator only appears when the API returns Sonnet limit data (Max plan)
+- **Language setting** — English by default (`Session` / `Week`); switch to `ru` (Сессия / Неделя) in VS Code settings; applies instantly without restart
+- **Account tooltip** — hover over the status bar to see the active account name and email (fetched live, always up to date after account switch)
+- **Switch account button** — account icon sits right next to the limits; click to log out and open the Claude Code login screen; hide it in settings if you use a single account
 - **Periodic refresh** — status updates every 60 seconds even when Claude is idle
 - **Click to refresh** — click the status bar item to force an immediate API fetch
 - **Cross-platform** — works on Windows, macOS, and Linux
@@ -20,36 +23,50 @@ Displays your **Claude Code rate limit usage** directly in the VS Code status ba
 
 ## How It Works
 
-The extension reads limit data from `~/.claude/limits.json`. This file is written by a **Stop hook** in Claude Code — a small Node.js script that calls the Anthropic OAuth usage API (`/api/oauth/usage`) after each Claude session ends and saves the result locally.
+The extension updates the status bar in two ways:
+
+**Automatic (every 60 s)** — the extension calls the Anthropic OAuth usage API (`/api/oauth/usage`) directly, using the token stored by Claude Code in `~/.claude/.credentials.json`, and saves the result to `~/.claude/limits.json`.
+
+**After each Claude session** — a Stop hook runs `save-limits.sh`, which also writes to `~/.claude/limits.json`. The extension watches the file and refreshes immediately on change.
 
 ```
-Claude Code session ends
+Every 60 seconds                    Claude Code session ends
+        ↓                                      ↓
+Extension → Anthropic API        Stop hook → Anthropic API
+        ↓                                      ↓
+~/.claude/limits.json ←————————————————————————
         ↓
-Stop hook runs save-limits.sh
-        ↓
-~/.claude/limits.json updated
-        ↓
-Extension reads file → Status Bar updated
+Status Bar updated
 ```
 
-No API calls are made by the extension itself. All data comes from the hook.
+Clicking the status bar item triggers an immediate API fetch (with a spinner while loading).
 
 ---
 
 ## Status Bar Format
 
+Without Sonnet data (Pro plan, or Max plan before Sonnet usage accumulates):
+
 ```
-Сессия: ████░░ 42% (~2ч) | Неделя: ██░░░░ 🟡65% | S: 🔴85%
+👤  Session: ████░░ 42% (~2h) | Week: ██░░░░ 🟡65% (~3d)
 ```
+
+With Sonnet data (Max plan):
+
+```
+👤  Session: ████░░ 42% (~2h) | Week: ██░░░░ 🟡65% (~3d) | S: 🔴85%
+```
+
+The `👤` account button sits immediately to the left of the limits. Hover over it to see the active account; click to switch. Hidden via `claudeLimits.showSwitchAccount = false`.
 
 | Element | Meaning |
 |---|---|
-| `Сессия` | 5-hour rolling session window |
-| `Неделя` | 7-day weekly window (all models) |
-| `S:` | 7-day weekly Sonnet-only limit (Max plan only — appears when API returns it) |
-| `████░░` | Filled segments out of 6 total |
+| `Session` | 5-hour rolling session window |
+| `Week` | 7-day weekly window (all models) |
+| `S:` | 7-day weekly Sonnet-only limit — Max plan only, appears when usage > 0% |
+| `████░░` | 6-segment progress bar — shown for Session and Week only |
 | `42%` | Current utilization percentage |
-| `(~2ч)` | Time remaining until reset |
+| `(~2h)` | Time remaining until reset |
 
 Warning circles appear next to the percentage:
 
@@ -110,13 +127,29 @@ On **Windows**, use the full path:
 
 ---
 
+## Settings
+
+Open VS Code Settings (`Ctrl+,`) and search for **Claude Limits**.
+
+| Setting | Options | Default | Description |
+|---|---|---|---|
+| `claudeLimits.language` | `ru`, `en` | `en` | Language for status bar labels and tooltip |
+| `claudeLimits.showSwitchAccount` | `true`, `false` | `true` | Show the account switch button next to the limits indicator |
+
+With `ru`: status bar shows `Сессия` / `Неделя`, tooltip says `клик для обновления`.
+
+> On first install, the extension shows a one-time notification with an **Open Settings** button to make switching easy.
+
+---
+
 ## Commands
 
 | Command | Description |
 |---|---|
-| `Claude Limits: Refresh` | Force-read `limits.json` and update status bar immediately |
+| `Claude Limits: Refresh` | Force-fetch limits from the API and update the status bar immediately |
+| `Claude Limits: Switch Account` | Log out of the current Claude account and open the login screen |
 
-Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) or by clicking the status bar item.
+Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`), by clicking the status bar item, or via the account button.
 
 ---
 

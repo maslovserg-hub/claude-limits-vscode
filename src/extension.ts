@@ -3,13 +3,41 @@ import * as fs from 'fs';
 import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
-import { parseLimits, formatStatusText } from './limits';
+import { parseLimits, formatStatusText, Lang } from './limits';
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const LIMITS_FILE = path.join(CLAUDE_DIR, 'limits.json');
 const HOOKS_DIR = path.join(CLAUDE_DIR, 'hooks');
 const HOOK_SCRIPT = path.join(HOOKS_DIR, 'save-limits.sh');
 const CLAUDE_SETTINGS = path.join(CLAUDE_DIR, 'settings.json');
+const CREDS_FILE = path.join(CLAUDE_DIR, '.credentials.json');
+
+function fetchAccountLabel(): Promise<string> {
+  return new Promise(resolve => {
+    try {
+      const creds = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf8'));
+      const token = creds?.claudeAiOauth?.accessToken;
+      if (!token) { resolve(''); return; }
+      https.get({
+        hostname: 'api.anthropic.com',
+        path: '/api/oauth/profile',
+        headers: { 'Authorization': 'Bearer ' + token, 'anthropic-beta': 'oauth-2025-04-20' }
+      }, res => {
+        let data = '';
+        res.on('data', (c: Buffer) => { data += c.toString(); });
+        res.on('end', () => {
+          try {
+            const d = JSON.parse(data);
+            const acc = d?.account;
+            if (!acc) { resolve(''); return; }
+            const label = acc.display_name ? `${acc.display_name} (${acc.email})` : acc.email;
+            resolve(label || '');
+          } catch { resolve(''); }
+        });
+      }).on('error', () => resolve(''));
+    } catch { resolve(''); }
+  });
+}
 
 const HOOK_CONTENT = `#!/usr/bin/env bash
 # Claude Limits Monitor: fetches rate limits after each response
@@ -87,18 +115,57 @@ function ensureHookSetup(): boolean {
 export function activate(context: vscode.ExtensionContext) {
   ensureHookSetup();
 
+  if (!context.globalState.get('languageHintShown')) {
+    context.globalState.update('languageHintShown', true);
+    vscode.window.showInformationMessage(
+      'Claude Limits: status bar is in English by default. Switch to Russian in Settings → claudeLimits.language = ru',
+      'Open Settings'
+    ).then(choice => {
+      if (choice === 'Open Settings') {
+        vscode.commands.executeCommand('workbench.action.openSettings', '@ext:maslovserg.claude-limits');
+      }
+    });
+  }
+
   const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   item.command = 'claudeLimits.refresh';
-  item.tooltip = 'Claude Limits — клик для обновления';
-
   context.subscriptions.push(item);
 
+  const switchItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
+  switchItem.text = '$(account)';
+  switchItem.command = 'claudeLimits.switchAccount';
+  switchItem.show();
+  context.subscriptions.push(switchItem);
+
+  const STRINGS: Record<Lang, { tooltip: string; updating: string; switchAccount: string }> = {
+    ru: { tooltip: 'Claude Limits — клик для обновления', updating: '$(sync~spin) Claude Limits: обновление...', switchAccount: 'Переключить аккаунт' },
+    en: { tooltip: 'Claude Limits — click to refresh', updating: '$(sync~spin) Claude Limits: updating...', switchAccount: 'Switch account' },
+  };
+
+  let cachedAccountLabel = '';
+
+  function applyTooltips(lang: Lang): void {
+    item.tooltip = cachedAccountLabel ? `${STRINGS[lang].tooltip}\n${cachedAccountLabel}` : STRINGS[lang].tooltip;
+    switchItem.tooltip = cachedAccountLabel ? `${STRINGS[lang].switchAccount}\n${cachedAccountLabel}` : STRINGS[lang].switchAccount;
+  }
+
+  function getLang(): Lang {
+    return vscode.workspace.getConfiguration('claudeLimits').get<Lang>('language', 'en');
+  }
+
+  function getSwitchVisible(): boolean {
+    return vscode.workspace.getConfiguration('claudeLimits').get<boolean>('showSwitchAccount', true);
+  }
+
   function refresh() {
+    const lang = getLang();
+    applyTooltips(lang);
+    if (getSwitchVisible()) { switchItem.show(); } else { switchItem.hide(); }
     try {
       const content = fs.readFileSync(LIMITS_FILE, 'utf8');
       const limits = parseLimits(content);
       if (limits) {
-        item.text = formatStatusText(limits);
+        item.text = formatStatusText(limits, lang);
       } else {
         item.text = 'Claude Limits: N/A';
       }
@@ -110,14 +177,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   function fetchAndRefresh(showSpinner = false) {
     if (showSpinner) {
-      item.text = '$(sync~spin) Claude Limits: обновление...';
+      item.text = STRINGS[getLang()].updating;
       item.show();
     }
 
-    const credsPath = path.join(CLAUDE_DIR, '.credentials.json');
+    fetchAccountLabel().then(label => {
+      cachedAccountLabel = label;
+      applyTooltips(getLang());
+    });
+
     let token: string;
     try {
-      const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+      const creds = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf8'));
       token = creds.claudeAiOauth?.accessToken;
       if (!token) { refresh(); return; }
     } catch { refresh(); return; }
@@ -155,11 +226,20 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.refresh', () => fetchAndRefresh(true)));
 
+  context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.switchAccount', async () => {
+    await vscode.commands.executeCommand('claude-vscode.logout');
+    await vscode.commands.executeCommand('claude-vscode.sidebar.open');
+  }));
+
   fs.watchFile(LIMITS_FILE, { interval: 1000 }, refresh);
   context.subscriptions.push({ dispose: () => fs.unwatchFile(LIMITS_FILE) });
 
   const timer = setInterval(fetchAndRefresh, 60_000);
   context.subscriptions.push({ dispose: () => clearInterval(timer) });
+
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+    if (e.affectsConfiguration('claudeLimits.language') || e.affectsConfiguration('claudeLimits.showSwitchAccount')) { refresh(); }
+  }));
 
   refresh();
 }
