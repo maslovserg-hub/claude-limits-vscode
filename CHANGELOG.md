@@ -1,9 +1,10 @@
 # Changelog
 
+## [0.3.1]
+- **Removed account switch button** — the button was calling `claude auth logout` globally, which logged out all active Claude Code sessions; removed entirely
+
 ## [0.3.0]
-- **Switch account button** — new account icon appears right next to the limits indicator; click triggers the Claude Code login screen (logout + open sidebar)
-- **Account in tooltip** — hovering over either the limits item or the switch button shows the active account name and email; fetched live from `/api/oauth/profile` so it always reflects the current session
-- **Show/hide switch button** — new setting `claudeLimits.showSwitchAccount` (default: on); uncheck in VS Code Settings to hide the button if you use a single account
+- **Account in tooltip** — hovering over the limits indicator shows the active account name and email, fetched live from `/api/oauth/profile`
 
 ## [0.2.9]
 - **Account in tooltip** — hovering over the status bar now shows the active Claude account (name + email) below the refresh hint

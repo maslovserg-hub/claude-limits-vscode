@@ -2,7 +2,7 @@
   "name": "claude-limits",
   "displayName": "Claude Limits Monitor",
   "description": "Shows Claude Code rate limits in VSCode status bar",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "maslovserg",
   "icon": "icon.png",
   "repository": {
@@ -24,10 +24,6 @@
       {
         "command": "claudeLimits.refresh",
         "title": "Claude Limits: Refresh"
-      },
-      {
-        "command": "claudeLimits.switchAccount",
-        "title": "Claude Limits: Switch Account"
       }
     ],
     "configuration": {
@@ -42,11 +38,6 @@
           ],
           "default": "en",
           "description": "Language for status bar labels"
-        },
-        "claudeLimits.showSwitchAccount": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show the account switch button in the status bar"
         }
       }
     }

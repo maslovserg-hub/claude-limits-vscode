@@ -131,36 +131,24 @@ export function activate(context: vscode.ExtensionContext) {
   item.command = 'claudeLimits.refresh';
   context.subscriptions.push(item);
 
-  const switchItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
-  switchItem.text = '$(account)';
-  switchItem.command = 'claudeLimits.switchAccount';
-  switchItem.show();
-  context.subscriptions.push(switchItem);
-
-  const STRINGS: Record<Lang, { tooltip: string; updating: string; switchAccount: string }> = {
-    ru: { tooltip: 'Claude Limits — клик для обновления', updating: '$(sync~spin) Claude Limits: обновление...', switchAccount: 'Переключить аккаунт' },
-    en: { tooltip: 'Claude Limits — click to refresh', updating: '$(sync~spin) Claude Limits: updating...', switchAccount: 'Switch account' },
+  const STRINGS: Record<Lang, { tooltip: string; updating: string }> = {
+    ru: { tooltip: 'Claude Limits — клик для обновления', updating: '$(sync~spin) Claude Limits: обновление...' },
+    en: { tooltip: 'Claude Limits — click to refresh', updating: '$(sync~spin) Claude Limits: updating...' },
   };
 
   let cachedAccountLabel = '';
 
   function applyTooltips(lang: Lang): void {
     item.tooltip = cachedAccountLabel ? `${STRINGS[lang].tooltip}\n${cachedAccountLabel}` : STRINGS[lang].tooltip;
-    switchItem.tooltip = cachedAccountLabel ? `${STRINGS[lang].switchAccount}\n${cachedAccountLabel}` : STRINGS[lang].switchAccount;
   }
 
   function getLang(): Lang {
     return vscode.workspace.getConfiguration('claudeLimits').get<Lang>('language', 'en');
   }
 
-  function getSwitchVisible(): boolean {
-    return vscode.workspace.getConfiguration('claudeLimits').get<boolean>('showSwitchAccount', true);
-  }
-
   function refresh() {
     const lang = getLang();
     applyTooltips(lang);
-    if (getSwitchVisible()) { switchItem.show(); } else { switchItem.hide(); }
     try {
       const content = fs.readFileSync(LIMITS_FILE, 'utf8');
       const limits = parseLimits(content);
@@ -226,11 +214,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.refresh', () => fetchAndRefresh(true)));
 
-  context.subscriptions.push(vscode.commands.registerCommand('claudeLimits.switchAccount', async () => {
-    await vscode.commands.executeCommand('claude-vscode.logout');
-    await vscode.commands.executeCommand('claude-vscode.sidebar.open');
-  }));
-
   fs.watchFile(LIMITS_FILE, { interval: 1000 }, refresh);
   context.subscriptions.push({ dispose: () => fs.unwatchFile(LIMITS_FILE) });
 
@@ -238,7 +221,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({ dispose: () => clearInterval(timer) });
 
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
-    if (e.affectsConfiguration('claudeLimits.language') || e.affectsConfiguration('claudeLimits.showSwitchAccount')) { refresh(); }
+    if (e.affectsConfiguration('claudeLimits.language')) { refresh(); }
   }));
 
   refresh();

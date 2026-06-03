@@ -13,8 +13,7 @@ Displays your **Claude Code rate limit usage** directly in the VS Code status ba
 - **Reset countdown** — shows time remaining (`~2h`, `~3d12h`) until the limit window resets
 - **Auto-hide Sonnet block** — compact `S:` indicator only appears when the API returns Sonnet limit data (Max plan)
 - **Language setting** — English by default (`Session` / `Week`); switch to `ru` (Сессия / Неделя) in VS Code settings; applies instantly without restart
-- **Account tooltip** — hover over the status bar to see the active account name and email (fetched live, always up to date after account switch)
-- **Switch account button** — account icon sits right next to the limits; click to log out and open the Claude Code login screen; hide it in settings if you use a single account
+- **Account tooltip** — hover over the status bar to see the active account name and email (fetched live, always up to date)
 - **Periodic refresh** — status updates every 60 seconds even when Claude is idle
 - **Click to refresh** — click the status bar item to force an immediate API fetch
 - **Cross-platform** — works on Windows, macOS, and Linux
@@ -48,16 +47,16 @@ Clicking the status bar item triggers an immediate API fetch (with a spinner whi
 Without Sonnet data (Pro plan, or Max plan before Sonnet usage accumulates):
 
 ```
-👤  Session: ████░░ 42% (~2h) | Week: ██░░░░ 🟡65% (~3d)
+Session: ████░░ 42% (~2h) | Week: ██░░░░ 🟡65% (~3d)
 ```
 
 With Sonnet data (Max plan):
 
 ```
-👤  Session: ████░░ 42% (~2h) | Week: ██░░░░ 🟡65% (~3d) | S: 🔴85%
+Session: ████░░ 42% (~2h) | Week: ██░░░░ 🟡65% (~3d) | S: 🔴85%
 ```
 
-The `👤` account button sits immediately to the left of the limits. Hover over it to see the active account; click to switch. Hidden via `claudeLimits.showSwitchAccount = false`.
+Hover over the status bar item to see the active account name and email.
 
 | Element | Meaning |
 |---|---|
@@ -134,7 +133,6 @@ Open VS Code Settings (`Ctrl+,`) and search for **Claude Limits**.
 | Setting | Options | Default | Description |
 |---|---|---|---|
 | `claudeLimits.language` | `ru`, `en` | `en` | Language for status bar labels and tooltip |
-| `claudeLimits.showSwitchAccount` | `true`, `false` | `true` | Show the account switch button next to the limits indicator |
 
 With `ru`: status bar shows `Сессия` / `Неделя`, tooltip says `клик для обновления`.
 
@@ -147,9 +145,8 @@ With `ru`: status bar shows `Сессия` / `Неделя`, tooltip says `кл�
 | Command | Description |
 |---|---|
 | `Claude Limits: Refresh` | Force-fetch limits from the API and update the status bar immediately |
-| `Claude Limits: Switch Account` | Log out of the current Claude account and open the login screen |
 
-Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`), by clicking the status bar item, or via the account button.
+Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) or by clicking the status bar item.
 
 ---
 
@@ -162,4 +159,4 @@ Access via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`), by clicking the
 
 ---
 
-Release history is in [CHANGELOG.md](CHANGELOG.md).
+Release history is in [CHANGELOG.md](https://github.com/maslovserg-hub/claude-limits-vscode/blob/HEAD/CHANGELOG.md).
