@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.2]
+- **Claude + Codex monitoring** — added independent status bar indicators for both services, so each keeps its full usage text
+- **Live Codex limits** — reads supported usage windows from the local Codex app-server, with recent local session logs as a fallback
+- **Shared refresh** — clicking either indicator refreshes Claude and Codex together; background refresh runs every 60 seconds
+- **Per-service visibility** — Claude and Codex each support Auto, Always, and Hidden modes
+- **Login-aware defaults** — Auto mode shows only connected services and removes stale Codex data after logout
+- **Localized tooltips** — concise click-to-refresh hints for both indicators; Claude also shows its active account
+- **New marketplace icon and description** — updated branding for combined Claude and Codex monitoring
+
 ## [0.3.1]
 - **Removed account switch button** — the button was calling `claude auth logout` globally, which logged out all active Claude Code sessions; removed entirely
 

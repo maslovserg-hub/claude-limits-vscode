@@ -3,7 +3,8 @@ import * as fs from 'fs';
 import * as https from 'https';
 import * as os from 'os';
 import * as path from 'path';
-import { parseLimits, formatStatusText, Lang } from './limits';
+import { spawn } from 'child_process';
+import { parseLimits, formatStatusText, parseCodexLimitsFromSessionLog, parseCodexLimitsFromWhamUsage, parseCodexLimitsFromAppServerRateLimits, formatCodexStatusText, shouldShowService, CodexLimitsData, VisibilityMode, Lang } from './limits';
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const LIMITS_FILE = path.join(CLAUDE_DIR, 'limits.json');
@@ -11,6 +12,138 @@ const HOOKS_DIR = path.join(CLAUDE_DIR, 'hooks');
 const HOOK_SCRIPT = path.join(HOOKS_DIR, 'save-limits.sh');
 const CLAUDE_SETTINGS = path.join(CLAUDE_DIR, 'settings.json');
 const CREDS_FILE = path.join(CLAUDE_DIR, '.credentials.json');
+const CODEX_SESSIONS_DIR = path.join(os.homedir(), '.codex', 'sessions');
+
+function findLatestCodexSessionFiles(dir: string, limit = 20): string[] {
+  const files: { file: string; mtimeMs: number }[] = [];
+
+  function walk(current: string): void {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+        try {
+          files.push({ file: fullPath, mtimeMs: fs.statSync(fullPath).mtimeMs });
+        } catch {}
+      }
+    }
+  }
+
+  walk(dir);
+  return files
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, limit)
+    .map(item => item.file);
+}
+
+function readLatestCodexLimits() {
+  for (const file of findLatestCodexSessionFiles(CODEX_SESSIONS_DIR)) {
+    try {
+      const limits = parseCodexLimitsFromSessionLog(fs.readFileSync(file, 'utf8'));
+      if (limits) return limits;
+    } catch {}
+  }
+  return null;
+}
+
+function fetchCodexLimits(onAccountLabel: (label: string) => void): Promise<CodexLimitsData | null> {
+  return fetchCodexLimitsFromAppServer(onAccountLabel);
+}
+
+function findCodexExecutable(): string | null {
+  const desktopBin = path.join(os.homedir(), 'AppData', 'Local', 'OpenAI', 'Codex', 'bin');
+  try {
+    const versions = fs.readdirSync(desktopBin, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => path.join(desktopBin, entry.name, 'codex.exe'))
+      .filter(file => fs.existsSync(file));
+    if (versions.length > 0) return versions[versions.length - 1];
+  } catch {}
+  return process.platform === 'win32' ? 'codex.cmd' : 'codex';
+}
+
+function fetchCodexLimitsFromAppServer(onAccountLabel: (label: string) => void): Promise<CodexLimitsData | null> {
+  return new Promise(resolve => {
+    const executable = findCodexExecutable();
+    if (!executable) {
+      resolve(null);
+      return;
+    }
+
+    let settled = false;
+    let buffer = '';
+    const child = spawn(executable, ['app-server'], {
+      env: { ...process.env, CODEX_HOME: path.join(os.homedir(), '.codex') },
+      stdio: ['pipe', 'pipe', 'ignore'],
+      windowsHide: true,
+    });
+
+    function finish(limits: CodexLimitsData | null): void {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { child.kill(); } catch {}
+      resolve(limits);
+    }
+
+    function send(message: unknown): void {
+      try {
+        child.stdin.write(JSON.stringify(message) + '\n');
+      } catch {
+        finish(null);
+      }
+    }
+
+    const timer = setTimeout(() => finish(null), 10_000);
+
+    child.on('error', () => finish(null));
+    child.stdout.on('data', (chunk: Buffer) => {
+      buffer += chunk.toString();
+      let newlineIndex = buffer.indexOf('\n');
+      while (newlineIndex >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim();
+        buffer = buffer.slice(newlineIndex + 1);
+        newlineIndex = buffer.indexOf('\n');
+        if (!line) continue;
+        try {
+          const message = JSON.parse(line);
+          if (message.id === 1) {
+            send({ method: 'initialized', params: {} });
+            send({ method: 'account/read', id: 2, params: { refreshToken: true } });
+          } else if (message.id === 2) {
+            const account = message.result?.account ?? message.result;
+            const email = typeof account?.email === 'string' ? account.email : '';
+            const name = typeof account?.displayName === 'string'
+              ? account.displayName
+              : typeof account?.name === 'string'
+                ? account.name
+                : '';
+            onAccountLabel(name && email ? `${name} (${email})` : email || name);
+            send({ method: 'account/rateLimits/read', id: 3 });
+          } else if (message.id === 3) {
+            finish(parseCodexLimitsFromAppServerRateLimits(message.result?.rateLimits));
+          }
+        } catch {}
+      }
+    });
+
+    send({
+      method: 'initialize',
+      id: 1,
+      params: {
+        clientInfo: { name: 'claude-limits-vscode', title: 'Claude Limits VS Code', version: '0.3.2' },
+      },
+    });
+  });
+}
 
 function fetchAccountLabel(): Promise<string> {
   return new Promise(resolve => {
@@ -127,51 +260,108 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
 
-  const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  item.command = 'claudeLimits.refresh';
-  context.subscriptions.push(item);
+  const claudeItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
+  const codexItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  claudeItem.command = 'claudeLimits.refresh';
+  codexItem.command = 'claudeLimits.refresh';
+  context.subscriptions.push(claudeItem, codexItem);
 
-  const STRINGS: Record<Lang, { tooltip: string; updating: string }> = {
-    ru: { tooltip: 'Claude Limits — клик для обновления', updating: '$(sync~spin) Claude Limits: обновление...' },
-    en: { tooltip: 'Claude Limits — click to refresh', updating: '$(sync~spin) Claude Limits: updating...' },
+  const STRINGS: Record<Lang, { tooltip: string; updating: string; codexTooltip: string }> = {
+    ru: {
+      tooltip: 'Claude Limits — клик для обновления',
+      updating: '$(sync~spin) Claude Limits: обновление...',
+      codexTooltip: 'Codex Limit: клик для обновления',
+    },
+    en: {
+      tooltip: 'Claude Limits — click to refresh',
+      updating: '$(sync~spin) Claude Limits: updating...',
+      codexTooltip: 'Codex Limit: click to refresh',
+    },
   };
 
   let cachedAccountLabel = '';
+  let cachedCodexAccountLabel = '';
+  let cachedCodexLimits: CodexLimitsData | null = null;
+  let codexConnected = false;
 
   function applyTooltips(lang: Lang): void {
-    item.tooltip = cachedAccountLabel ? `${STRINGS[lang].tooltip}\n${cachedAccountLabel}` : STRINGS[lang].tooltip;
+    claudeItem.tooltip = cachedAccountLabel
+      ? `${STRINGS[lang].tooltip}\n${cachedAccountLabel}`
+      : STRINGS[lang].tooltip;
+    codexItem.tooltip = cachedCodexAccountLabel
+      ? `${STRINGS[lang].codexTooltip}\n${cachedCodexAccountLabel}`
+      : STRINGS[lang].codexTooltip;
   }
 
   function getLang(): Lang {
     return vscode.workspace.getConfiguration('claudeLimits').get<Lang>('language', 'en');
   }
 
+  function getVisibility(key: 'claudeVisibility' | 'codexVisibility'): VisibilityMode {
+    return vscode.workspace.getConfiguration('claudeLimits').get<VisibilityMode>(key, 'auto');
+  }
+
+  function isClaudeConnected(): boolean {
+    try {
+      const creds = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf8'));
+      return typeof creds?.claudeAiOauth?.accessToken === 'string' && creds.claudeAiOauth.accessToken.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
   function refresh() {
     const lang = getLang();
     applyTooltips(lang);
+    let claudeText: string;
     try {
       const content = fs.readFileSync(LIMITS_FILE, 'utf8');
       const limits = parseLimits(content);
       if (limits) {
-        item.text = formatStatusText(limits, lang);
+        claudeText = formatStatusText(limits, lang);
       } else {
-        item.text = 'Claude Limits: N/A';
+        claudeText = 'Claude: N/A';
       }
     } catch {
-      item.text = 'Claude Limits: no data';
+      claudeText = 'Claude: no data';
     }
-    item.show();
+
+    const codexLimits = cachedCodexLimits ?? readLatestCodexLimits();
+    const codexText = codexLimits ? formatCodexStatusText(codexLimits, lang) : 'Codex: no data';
+    claudeItem.text = claudeText;
+    codexItem.text = codexText;
+    if (shouldShowService(getVisibility('claudeVisibility'), isClaudeConnected())) {
+      claudeItem.show();
+    } else {
+      claudeItem.hide();
+    }
+    if (shouldShowService(getVisibility('codexVisibility'), codexConnected)) {
+      codexItem.show();
+    } else {
+      codexItem.hide();
+    }
   }
 
   function fetchAndRefresh(showSpinner = false) {
     if (showSpinner) {
-      item.text = STRINGS[getLang()].updating;
-      item.show();
+      claudeItem.text = STRINGS[getLang()].updating;
+      codexItem.text = '$(sync~spin) Codex: updating...';
+      if (shouldShowService(getVisibility('claudeVisibility'), isClaudeConnected())) claudeItem.show();
+      if (shouldShowService(getVisibility('codexVisibility'), codexConnected)) codexItem.show();
     }
 
     fetchAccountLabel().then(label => {
       cachedAccountLabel = label;
       applyTooltips(getLang());
+    });
+
+    fetchCodexLimits(label => {
+      cachedCodexAccountLabel = label;
+      applyTooltips(getLang());
+    }).then(limits => {
+      cachedCodexLimits = limits;
+      codexConnected = Boolean(limits);
+      refresh();
     });
 
     let token: string;
@@ -221,10 +411,16 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({ dispose: () => clearInterval(timer) });
 
   context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
-    if (e.affectsConfiguration('claudeLimits.language')) { refresh(); }
+    if (
+      e.affectsConfiguration('claudeLimits.language') ||
+      e.affectsConfiguration('claudeLimits.claudeVisibility') ||
+      e.affectsConfiguration('claudeLimits.codexVisibility')
+    ) {
+      refresh();
+    }
   }));
 
-  refresh();
+  fetchAndRefresh();
 }
 
 export function deactivate() {}

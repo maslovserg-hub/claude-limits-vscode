@@ -1,0 +1,13 @@
+src/**
+memory/**
+tmp/**
+node_modules/**
+.git/**
+.sixth/**
+*.vsix
+*.log
+package-lock.json
+tsconfig.json
+CLAUDE.md
+icon-original.png
+**/*.test.*

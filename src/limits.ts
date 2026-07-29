@@ -7,6 +7,28 @@ export interface LimitsData {
   sevenDaySonnetResetsAt?: string;
 }
 
+export interface CodexLimitWindow {
+  usedPercent: number;
+  windowMinutes: number;
+  resetsAt?: string;
+  label?: string;
+}
+
+export interface CodexLimitsData {
+  primary?: CodexLimitWindow;
+  secondary?: CodexLimitWindow;
+  individual?: CodexLimitWindow;
+  planType?: string;
+}
+
+export type VisibilityMode = 'auto' | 'always' | 'hidden';
+
+export function shouldShowService(mode: VisibilityMode, connected: boolean): boolean {
+  if (mode === 'hidden') return false;
+  if (mode === 'always') return true;
+  return connected;
+}
+
 const BAR_WIDTH = 6;
 
 export function parseLimits(jsonStr: string): LimitsData | null {
@@ -92,6 +114,136 @@ export function formatSevenDaySonnetText(limits: LimitsData): string | null {
 export function formatStatusText(limits: LimitsData, lang: Lang = 'en'): string {
   const base = `${formatFiveHourText(limits, lang)} | ${formatSevenDayText(limits, lang)}`;
   const sonnet = formatSevenDaySonnetText(limits);
-  if (!sonnet) return base;
-  return `${base} | ${sonnet}`;
+  if (!sonnet) return `Claude: ${base}`;
+  return `Claude: ${base} | ${sonnet}`;
+}
+
+function parseCodexReset(value: unknown): string | undefined {
+  if (typeof value === 'number') return new Date(value * 1000).toISOString();
+  if (typeof value === 'string') return value;
+  return undefined;
+}
+
+function parseCodexWindow(data: unknown, label?: string): CodexLimitWindow | undefined {
+  const window = data as {
+    used_percent?: unknown;
+    usedPercent?: unknown;
+    window_minutes?: unknown;
+    windowDurationMins?: unknown;
+    limit_window_seconds?: unknown;
+    resets_at?: unknown;
+    resetsAt?: unknown;
+    reset_at?: unknown;
+  } | null;
+  const windowMinutes = typeof window?.window_minutes === 'number'
+    ? window.window_minutes
+    : typeof window?.windowDurationMins === 'number'
+      ? window.windowDurationMins
+    : typeof window?.limit_window_seconds === 'number'
+      ? Math.round(window.limit_window_seconds / 60)
+      : undefined;
+  const usedPercent = typeof window?.used_percent === 'number'
+    ? window.used_percent
+    : typeof window?.usedPercent === 'number'
+      ? window.usedPercent
+      : undefined;
+  if (typeof usedPercent !== 'number' || typeof windowMinutes !== 'number') return undefined;
+  const resetsAt = parseCodexReset(window?.resets_at ?? window?.reset_at ?? window?.resetsAt);
+  return {
+    usedPercent: Math.round(usedPercent),
+    windowMinutes,
+    resetsAt: resetsAt && new Date(resetsAt).getTime() > Date.now() ? resetsAt : undefined,
+    label,
+  };
+}
+
+export function parseCodexLimitsFromJsonLine(line: string): CodexLimitsData | null {
+  try {
+    const data = JSON.parse(line);
+    const rateLimits = data?.payload?.rate_limits;
+    if (!rateLimits) return null;
+    const primary = parseCodexWindow(rateLimits.primary);
+    const secondary = parseCodexWindow(rateLimits.secondary);
+    const individual = parseCodexWindow(rateLimits.individual_limit, 'I');
+    if (!primary && !secondary && !individual) return null;
+    return {
+      primary,
+      secondary,
+      individual,
+      planType: typeof rateLimits.plan_type === 'string' ? rateLimits.plan_type : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function parseCodexLimitsFromSessionLog(content: string): CodexLimitsData | null {
+  let latest: CodexLimitsData | null = null;
+  for (const line of content.split(/\r?\n/)) {
+    if (!line.includes('"rate_limits"')) continue;
+    const limits = parseCodexLimitsFromJsonLine(line);
+    if (limits) latest = limits;
+  }
+  return latest;
+}
+
+export function parseCodexLimitsFromWhamUsage(jsonStr: string): CodexLimitsData | null {
+  try {
+    const data = JSON.parse(jsonStr);
+    const rateLimit = data?.rate_limit ?? data?.rateLimit;
+    if (!rateLimit) return null;
+    const primary = parseCodexWindow(rateLimit.primary_window ?? rateLimit.primaryWindow);
+    const secondary = parseCodexWindow(rateLimit.secondary_window ?? rateLimit.secondaryWindow);
+    const individual = parseCodexWindow(rateLimit.individual_limit ?? rateLimit.individualLimit, 'I');
+    if (!primary && !secondary && !individual) return null;
+    return {
+      primary,
+      secondary,
+      individual,
+      planType: typeof data?.plan_type === 'string' ? data.plan_type : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function parseCodexLimitsFromAppServerRateLimits(rateLimits: unknown): CodexLimitsData | null {
+  const data = rateLimits as { primary?: unknown; secondary?: unknown; individualLimit?: unknown; planType?: unknown } | null;
+  const primary = parseCodexWindow(data?.primary);
+  const secondary = parseCodexWindow(data?.secondary);
+  const individual = parseCodexWindow(data?.individualLimit, 'I');
+  if (!primary && !secondary && !individual) return null;
+  return {
+    primary,
+    secondary,
+    individual,
+    planType: typeof data?.planType === 'string' ? data.planType : undefined,
+  };
+}
+
+function getCodexWindowLabel(windowMinutes: number, lang: Lang): string {
+  if (windowMinutes >= 10080) return LABELS[lang].week;
+  if (windowMinutes <= 300) return LABELS[lang].session;
+  const hours = Math.round(windowMinutes / 60);
+  return hours >= 1 ? `${hours}h` : `${windowMinutes}m`;
+}
+
+export function formatCodexWindowText(window: CodexLimitWindow, lang: Lang = 'en'): string {
+  if (window.label) {
+    const emoji = getStatusEmoji(window.usedPercent);
+    return `${window.label}: ${emoji}${window.usedPercent}%`;
+  }
+
+  const bar = formatProgressBar(window.usedPercent);
+  const emoji = getStatusEmoji(window.usedPercent);
+  const time = window.resetsAt ? ` (~${formatTimeRemaining(window.resetsAt)})` : '';
+  return `${getCodexWindowLabel(window.windowMinutes, lang)}: ${bar} ${emoji}${window.usedPercent}%${time}`;
+}
+
+export function formatCodexStatusText(limits: CodexLimitsData, lang: Lang = 'en'): string {
+  const blocks = [limits.secondary, limits.primary, limits.individual]
+    .filter((window): window is CodexLimitWindow => Boolean(window))
+    .sort((a, b) => a.windowMinutes - b.windowMinutes)
+    .map(window => formatCodexWindowText(window, lang));
+  return blocks.length > 0 ? `Codex: ${blocks.join(' | ')}` : 'Codex Limits: N/A';
 }

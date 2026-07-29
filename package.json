@@ -1,8 +1,8 @@
 {
   "name": "claude-limits",
-  "displayName": "Claude Limits Monitor",
-  "description": "Shows Claude Code rate limits in VSCode status bar",
-  "version": "0.3.1",
+  "displayName": "Claude & Codex Limits",
+  "description": "Monitor Claude Code and Codex usage limits in separate VS Code status bar indicators.",
+  "version": "0.3.2",
   "publisher": "maslovserg",
   "icon": "icon.png",
   "repository": {
@@ -23,21 +23,54 @@
     "commands": [
       {
         "command": "claudeLimits.refresh",
-        "title": "Claude Limits: Refresh"
+        "title": "Claude & Codex Limits: Refresh"
       }
     ],
     "configuration": {
-      "title": "Claude Limits",
+      "title": "Claude & Codex Limits",
       "properties": {
         "claudeLimits.language": {
           "type": "string",
-          "enum": ["ru", "en"],
+          "enum": [
+            "ru",
+            "en"
+          ],
           "enumDescriptions": [
             "Russian: Сессия / Неделя",
             "English: Session / Week"
           ],
           "default": "en",
           "description": "Language for status bar labels"
+        },
+        "claudeLimits.claudeVisibility": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "hidden"
+          ],
+          "enumDescriptions": [
+            "Show only when signed in to Claude",
+            "Always show the Claude indicator",
+            "Always hide the Claude indicator"
+          ],
+          "default": "auto",
+          "description": "Controls Claude limits visibility"
+        },
+        "claudeLimits.codexVisibility": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "hidden"
+          ],
+          "enumDescriptions": [
+            "Show only when signed in to Codex",
+            "Always show the Codex indicator",
+            "Always hide the Codex indicator"
+          ],
+          "default": "auto",
+          "description": "Controls Codex limits visibility"
         }
       }
     }
