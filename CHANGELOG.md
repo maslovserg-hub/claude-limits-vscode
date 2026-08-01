@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.3]
+- **Fixed Claude limits stuck at 0%** — Anthropic's edge started rejecting requests sent from Node.js with `403 Request not allowed`, so usage data could no longer be fetched; the extension and the Stop hook now use `curl` instead
+- **No more silently stale numbers** — the indicator shows a warning icon when the data itself is out of date (not updated for more than two refresh intervals), and the tooltip explains why (for example `HTTP 429`) instead of quietly displaying old values as current. A failed refresh alone is not flagged while the Stop hook keeps the numbers current
+- **Background refresh every 5 minutes** — the usage endpoint rate-limits frequent polling, so the previous 60-second interval was too aggressive
+- **Background refresh skips redundant requests** — if the Stop hook already refreshed the data within the interval, the scheduled poll reuses it; clicking the indicator always forces a real request
+- **Codex account is shown in the tooltip again** — the Codex app-server now returns `account: null`, so the signed-in name and email are read from the local `~/.codex/auth.json` instead
+- **Stop hook no longer calls the API after every single response** — if `limits.json` was updated less than a minute ago, the hook exits without making a request, which keeps a busy session from running into `429`
+- **Stop hook is rewritten only when its content changes** — local edits are no longer overwritten on every activation
+
 ## [0.3.2]
 - **Claude + Codex monitoring** — added independent status bar indicators for both services, so each keeps its full usage text
 - **Live Codex limits** — reads supported usage windows from the local Codex app-server, with recent local session logs as a fallback

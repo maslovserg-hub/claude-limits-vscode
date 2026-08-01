@@ -10,6 +10,7 @@ import {
   parseCodexLimitsFromSessionLog,
   parseCodexLimitsFromWhamUsage,
   parseCodexLimitsFromAppServerRateLimits,
+  parseCodexAccountLabel,
   formatCodexStatusText,
   shouldShowService,
 } from './limits';
@@ -280,5 +281,36 @@ describe('parseCodexLimits', () => {
     }, 'en');
 
     expect(result).toBe('Codex: Session: █░░░░░ 12% | Week: ███░░░ 50% | I: 🔴85%');
+  });
+});
+
+describe('parseCodexAccountLabel', () => {
+  function makeToken(claims: Record<string, unknown>): string {
+    const payload = Buffer.from(JSON.stringify(claims), 'utf8').toString('base64url');
+    return `header.${payload}.signature`;
+  }
+
+  it('combines name and email', () => {
+    expect(parseCodexAccountLabel(makeToken({ name: 'Сергей', email: 'user@example.com' })))
+      .toBe('Сергей (user@example.com)');
+  });
+
+  it('falls back to email when the name is missing', () => {
+    expect(parseCodexAccountLabel(makeToken({ email: 'user@example.com' }))).toBe('user@example.com');
+  });
+
+  it('falls back to name when the email is missing', () => {
+    expect(parseCodexAccountLabel(makeToken({ name: 'Сергей' }))).toBe('Сергей');
+  });
+
+  it('returns an empty string for tokens without account claims', () => {
+    expect(parseCodexAccountLabel(makeToken({ sub: 'abc' }))).toBe('');
+  });
+
+  it('returns an empty string for malformed input', () => {
+    expect(parseCodexAccountLabel('not-a-jwt')).toBe('');
+    expect(parseCodexAccountLabel('header.@@@notbase64@@@.signature')).toBe('');
+    expect(parseCodexAccountLabel(undefined)).toBe('');
+    expect(parseCodexAccountLabel(null)).toBe('');
   });
 });

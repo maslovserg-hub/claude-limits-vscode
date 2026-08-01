@@ -33,13 +33,17 @@ The displayed percentage is the portion of the limit already used. A value of `1
 
 ### Claude Code
 
-Every 60 seconds, the extension reads the Claude OAuth token from `~/.claude/.credentials.json`, requests current usage from the Anthropic API, and stores the latest result in `~/.claude/limits.json`.
+Every 5 minutes, the extension reads the Claude OAuth token from `~/.claude/.credentials.json`, requests current usage from the Anthropic API via `curl`, and stores the latest result in `~/.claude/limits.json`.
 
 On first activation, the extension also configures a Claude Code Stop hook. The hook refreshes `limits.json` after a Claude session, and the extension watches that file for immediate updates.
+
+If the stored data stops being updated, the indicator keeps the last known numbers but marks them with a warning icon, and the tooltip shows the reason. Percentages are never silently presented as current when they are not.
 
 ### Codex
 
 The extension requests live rate-limit data from the local Codex app-server. If live data is temporarily unavailable, it can read the most recent rate-limit event from local Codex session logs.
+
+The signed-in Codex account shown in the tooltip comes from the app-server when it provides one, and otherwise from the local `~/.codex/auth.json`.
 
 Only windows actually returned by Codex are displayed. For example, an account that exposes only a weekly limit shows only `Week` / `Неделя`.
 
@@ -56,6 +60,7 @@ Install from the Visual Studio Marketplace or install a local `.vsix`:
 - VS Code 1.85 or newer
 - Claude Code installed and signed in to display Claude limits
 - Codex installed and signed in to display Codex limits
+- `curl` available in `PATH` (bundled with Windows 10+, macOS, and most Linux distributions)
 - Node.js available in `PATH` for the Claude Stop hook
 
 The extension can display either service independently. You do not need to use both.

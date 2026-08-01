@@ -247,3 +247,18 @@ export function formatCodexStatusText(limits: CodexLimitsData, lang: Lang = 'en'
     .map(window => formatCodexWindowText(window, lang));
   return blocks.length > 0 ? `Codex: ${blocks.join(' | ')}` : 'Codex Limits: N/A';
 }
+
+// Codex-аккаунт: app-server может вернуть account: null, тогда имя и почту берём из id_token в ~/.codex/auth.json.
+export function parseCodexAccountLabel(idToken: unknown): string {
+  if (typeof idToken !== 'string') return '';
+  const payload = idToken.split('.')[1];
+  if (!payload) return '';
+  try {
+    const claims = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+    const email = typeof claims?.email === 'string' ? claims.email : '';
+    const name = typeof claims?.name === 'string' ? claims.name : '';
+    return name && email ? `${name} (${email})` : email || name;
+  } catch {
+    return '';
+  }
+}

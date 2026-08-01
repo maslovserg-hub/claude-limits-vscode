@@ -2,7 +2,7 @@
   "name": "claude-limits",
   "displayName": "Claude & Codex Limits",
   "description": "Monitor Claude Code and Codex usage limits in separate VS Code status bar indicators.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publisher": "maslovserg",
   "icon": "icon.png",
   "repository": {
