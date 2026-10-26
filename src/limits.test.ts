@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   parseLimits,
   formatProgressBar,
@@ -312,5 +312,29 @@ describe('parseCodexAccountLabel', () => {
     expect(parseCodexAccountLabel('header.@@@notbase64@@@.signature')).toBe('');
     expect(parseCodexAccountLabel(undefined)).toBe('');
     expect(parseCodexAccountLabel(null)).toBe('');
+  });
+});
+
+
+describe('optional progress bars', () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(1793019600000); });
+  afterEach(() => { vi.restoreAllMocks(); });
+  it.each(['ru', 'en'] as const)('keeps Claude numbers and timers without bars (%s)', lang => {
+    const limits = { fiveHour: 10, sevenDay: 30, fiveHourResetsAt: new Date(Date.now() + 3600000).toISOString() };
+    const normal = formatStatusText(limits, lang);
+    const compact = formatStatusText(limits, lang, false);
+    expect(normal).toMatch(/[█░]/);
+    expect(compact).toBe(normal.replace(/[█░]+ /g, ''));
+    expect(compact).toContain('10% (~');
+    expect(compact).not.toContain('  ');
+  });
+  it.each(['ru', 'en'] as const)('keeps Codex windows and timers without bars (%s)', lang => {
+    const limits = { primary: { usedPercent: 10, windowMinutes: 300, resetsAt: new Date(Date.now() + 3600000).toISOString() }, secondary: { usedPercent: 84, windowMinutes: 10080 } };
+    const normal = formatCodexStatusText(limits, lang);
+    const compact = formatCodexStatusText(limits, lang, false);
+    expect(normal).toMatch(/[█░]/);
+    expect(compact).toBe(normal.replace(/[█░]+ /g, ''));
+    expect(compact).toContain('84%');
+    expect(compact).not.toContain('  ');
   });
 });

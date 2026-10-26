@@ -11,7 +11,7 @@ Monitor **Claude Code** and **Codex** usage limits directly in the VS Code statu
 - **Reset countdowns** — shows the approximate time until each available window resets
 - **Warning indicators** — 🟡 at 60–79% usage and 🔴 at 80%+
 - **Shared refresh** — click either indicator to refresh Claude and Codex together
-- **Automatic refresh** — both services update every 60 seconds
+- **Automatic refresh** — both services update every 5 minutes
 - **Per-service visibility** — show each indicator automatically, always, or never
 - **Russian and English labels** — switch languages without restarting VS Code
 - **Claude account tooltip** — hover over Claude to see the active account name and email
@@ -43,6 +43,8 @@ If the stored data stops being updated, the indicator keeps the last known numbe
 
 The extension requests live rate-limit data from the local Codex app-server. If live data is temporarily unavailable, it can read the most recent rate-limit event from local Codex session logs.
 
+Codex requests allow up to 60 seconds for slow responses, reuse the current authentication without forcing a token refresh on each poll, and avoid overlapping requests.
+
 The signed-in Codex account shown in the tooltip comes from the app-server when it provides one, and otherwise from the local `~/.codex/auth.json`.
 
 Only windows actually returned by Codex are displayed. For example, an account that exposes only a weekly limit shows only `Week` / `Неделя`.
@@ -59,7 +61,7 @@ Install from the Visual Studio Marketplace or install a local `.vsix`:
 
 - VS Code 1.85 or newer
 - Claude Code installed and signed in to display Claude limits
-- Codex installed and signed in to display Codex limits
+- Codex VS Code extension installed and signed in, or a supported local Codex executable, to display Codex limits (no separate desktop app required)
 - `curl` available in `PATH` (bundled with Windows 10+, macOS, and most Linux distributions)
 - Node.js available in `PATH` for the Claude Stop hook
 
@@ -71,6 +73,7 @@ Open VS Code Settings (`Ctrl+,`) and search for **Claude Limits**.
 
 | Setting | Options | Default | Description |
 |---|---|---|---|
+| `claudeLimits.showProgressBars` | `true`, `false` | `true` | Show progress bars for both services; disable to save space. Applies immediately. |
 | `claudeLimits.language` | `ru`, `en` | `en` | Language for labels and tooltips |
 | `claudeLimits.claudeVisibility` | `auto`, `always`, `hidden` | `auto` | Controls the Claude indicator |
 | `claudeLimits.codexVisibility` | `auto`, `always`, `hidden` | `auto` | Controls the Codex indicator |
@@ -98,9 +101,13 @@ The command is available from the Command Palette and runs when either status ba
 
 ## Known Limitations
 
-- Background refresh runs every 60 seconds; click either indicator for an immediate update.
+- Background refresh runs every 5 minutes; click either indicator for an immediate update.
 - Available limit windows depend on the data exposed by each service and account plan.
-- Codex account name and email are not currently exposed by the local `account/read` response, so the Codex tooltip contains only the refresh hint.
+- Codex account details use local authentication data when `account/read` does not provide them.
 - If a service changes its local credential or rate-limit interface, a future extension update may be required.
 
 Release history is available in [CHANGELOG.md](https://github.com/maslovserg-hub/claude-limits-vscode/blob/HEAD/CHANGELOG.md).
+
+### Service icons
+
+Claude and Codex labels include their service logos. The bundled icons follow the status bar text color and stay visible when progress bars are hidden.

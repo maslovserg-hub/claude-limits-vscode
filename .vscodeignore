@@ -11,3 +11,6 @@ tsconfig.json
 CLAUDE.md
 icon-original.png
 **/*.test.*
+
+tools/**
+resources/*.svg

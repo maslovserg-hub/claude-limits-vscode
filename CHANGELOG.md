@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.4]
+- Fixed Codex limits getting stuck when responses take longer than 10 seconds: allow up to 60 seconds, avoid forced token refresh on each poll, and prevent overlapping requests.
+- Aligned service logo font metrics with VS Code icons.
+- Suppressed startup warnings for 30 seconds and retry Codex after 10 and 20 seconds; persistent failures still show a warning.
+- Added recognizable Claude and Codex logos before their status bar labels, including loading and error states.
+- Icons are bundled as a small font and follow the status bar text color; progress bar visibility remains independent.
+
+
+- Added the `claudeLimits.showProgressBars` checkbox (enabled by default). Turning it off hides bars for both services immediately, keeping percentages and reset times.
+- Codex now discovers the executable bundled with the VS Code Codex extension; no separate desktop app or CLI installation is needed.
+- Codex request failures keep the indicator visible with an error tooltip instead of silently hiding it. Previously fetched limits remain visible with a warning.
+
 ## [0.3.3]
 - **Fixed Claude limits stuck at 0%** — Anthropic's edge started rejecting requests sent from Node.js with `403 Request not allowed`, so usage data could no longer be fetched; the extension and the Stop hook now use `curl` instead
 - **No more silently stale numbers** — the indicator shows a warning icon when the data itself is out of date (not updated for more than two refresh intervals), and the tooltip explains why (for example `HTTP 429`) instead of quietly displaying old values as current. A failed refresh alone is not flagged while the Stop hook keeps the numbers current

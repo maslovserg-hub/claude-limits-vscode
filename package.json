@@ -2,7 +2,7 @@
   "name": "claude-limits",
   "displayName": "Claude & Codex Limits",
   "description": "Monitor Claude Code and Codex usage limits in separate VS Code status bar indicators.",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "maslovserg",
   "icon": "icon.png",
   "repository": {
@@ -71,6 +71,27 @@
           ],
           "default": "auto",
           "description": "Controls Codex limits visibility"
+        },
+        "claudeLimits.showProgressBars": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show progress bars for Claude and Codex. Disable to save status bar space; percentages and reset times remain visible."
+        }
+      }
+    },
+    "icons": {
+      "claude-limits-claude": {
+        "description": "Claude service logo",
+        "default": {
+          "fontPath": "./resources/service-icons.woff",
+          "fontCharacter": "\\E001"
+        }
+      },
+      "claude-limits-codex": {
+        "description": "Codex service logo",
+        "default": {
+          "fontPath": "./resources/service-icons.woff",
+          "fontCharacter": "\\E002"
         }
       }
     }
