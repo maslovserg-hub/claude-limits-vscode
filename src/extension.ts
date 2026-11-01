@@ -245,17 +245,21 @@ function fetchAccountLabel(): Promise<string> {
 }
 
 // Только чтение: токен продлевает сам Kimi Code, пока открыт. Мы его не обновляем и в файлы Kimi не пишем.
-function fetchKimi(url: string): Promise<{ body: string; error: string }> {
+function readKimiToken(): { token: string; error: string } {
   let creds: { access_token?: unknown; expires_at?: unknown };
   try {
     creds = JSON.parse(fs.readFileSync(KIMI_CREDS_FILE, 'utf8'));
   } catch {
-    return Promise.resolve({ body: '', error: 'no credentials' });
+    return { token: '', error: 'no credentials' };
   }
-  if (typeof creds?.access_token !== 'string' || !creds.access_token) return Promise.resolve({ body: '', error: 'no credentials' });
-  if (typeof creds.expires_at === 'number' && creds.expires_at * 1000 <= Date.now()) return Promise.resolve({ body: '', error: 'token expired' });
+  if (typeof creds?.access_token !== 'string' || !creds.access_token) return { token: '', error: 'no credentials' };
+  if (typeof creds.expires_at === 'number' && creds.expires_at * 1000 <= Date.now()) return { token: '', error: 'token expired' };
+  return { token: creds.access_token, error: '' };
+}
+
+function fetchKimi(url: string, token: string): Promise<{ body: string; error: string }> {
   return fetch(url, {
-    headers: { Authorization: `Bearer ${creds.access_token}`, Accept: 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
     signal: AbortSignal.timeout(10_000),
   })
     .then(async res => res.ok ? { body: await res.text(), error: '' } : { body: '', error: `HTTP ${res.status}` })
@@ -529,8 +533,12 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function fetchKimiAndRefresh() {
-    if (!isKimiLoggedIn()) { kimiFetchError = ''; refresh(); return; }
-    Promise.all([fetchKimi(KIMI_USAGE_URL), fetchKimi(KIMI_PROFILE_URL)]).then(([usage, profile]) => {
+    // Без запроса панель не перерисовываем: refresh() в том же тике стёр бы крутилку ручного обновления
+    // у всех индикаторов раньше, чем VS Code её покажет. Панель перерисуют ответы Claude и Codex.
+    if (!isKimiLoggedIn()) { kimiFetchError = ''; return; }
+    const { token, error } = readKimiToken();
+    if (!token) { kimiFetchError = error; applyTooltips(getLang()); return; }
+    Promise.all([fetchKimi(KIMI_USAGE_URL, token), fetchKimi(KIMI_PROFILE_URL, token)]).then(([usage, profile]) => {
       const limits = parseKimiUsage(usage.body);
       if (limits) {
         cachedKimiLimits = limits;

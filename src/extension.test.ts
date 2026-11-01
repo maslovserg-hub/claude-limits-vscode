@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   kimiExpiresAt: 0,
   kimiStatus: 200,
   refreshCommand: undefined as undefined | (() => void),
+  claudeToken: false,
 }));
 vi.mock('vscode', () => ({
   extensions: { getExtension: () => ({ extensionPath: '/codex-extension' }) },
@@ -34,6 +35,7 @@ vi.mock('fs', () => ({
   readdirSync: () => [], statSync: () => ({ mtimeMs: Date.now() }),
   readFileSync: (file: string) => {
     if (state.missing.some(name => file.endsWith(name))) throw new Error('ENOENT');
+    if (file.endsWith('.credentials.json') && state.claudeToken) return JSON.stringify({ claudeAiOauth: { accessToken: 'claude-token' } });
     if (file.endsWith('kimi-code.json')) return JSON.stringify({ access_token: 'kimi-token', expires_at: state.kimiExpiresAt });
     if (file.endsWith('auth.json')) {
       const claims = Buffer.from(JSON.stringify({ name: 'Sergey', email: 'me@example.com' })).toString('base64url');
@@ -74,7 +76,7 @@ import { activate } from './extension';
 
 describe('extension integration', () => {
   beforeEach(() => { vi.useFakeTimers(); state.bars = true; state.fail = false; state.limitsDelay = 0; state.requests = []; state.items = []; state.spawned = [];
-    state.config = {}; state.missing = []; state.kimiExpiresAt = Date.now() / 1000 + 900; state.kimiStatus = 200; fetchMock.mockClear(); });
+    state.config = {}; state.missing = []; state.kimiExpiresAt = Date.now() / 1000 + 900; state.kimiStatus = 200; state.claudeToken = false; fetchMock.mockClear(); });
   afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
   async function start() {
     activate({
@@ -214,5 +216,16 @@ describe('extension integration', () => {
     expect(state.items[0].text).toBe('$(claude-limits-claude) Claude: S: █░░░░░ 10% | W: ██░░░░ 30%');
     expect(state.items[1].text).toBe('$(claude-limits-codex) Codex: S: █░░░░░ 18%');
     expect(state.items[2].text).toBe('$(claude-limits-kimi) Kimi: S: ░░░░░░ 5% | M: ░░░░░░ 1%');
+  });
+
+  it('keeps the click spinner while Kimi skips an expired token', async () => {
+    state.claudeToken = true;
+    state.limitsDelay = 1000;
+    state.kimiExpiresAt = Date.now() / 1000 - 1;
+    await start();
+    await vi.advanceTimersByTimeAsync(30_000);
+    state.refreshCommand!();
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    for (const item of state.items) expect(item.text).toContain('$(sync~spin)');
   });
 });
