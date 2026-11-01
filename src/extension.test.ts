@@ -34,6 +34,10 @@ vi.mock('fs', () => ({
   readFileSync: (file: string) => {
     if (state.missing.some(name => file.endsWith(name))) throw new Error('ENOENT');
     if (file.endsWith('kimi-code.json')) return JSON.stringify({ access_token: 'kimi-token', expires_at: state.kimiExpiresAt });
+    if (file.endsWith('auth.json')) {
+      const claims = Buffer.from(JSON.stringify({ name: 'Sergey', email: 'me@example.com' })).toString('base64url');
+      return JSON.stringify({ tokens: { id_token: `h.${claims}.s` } });
+    }
     if (file.endsWith('limits.json')) return JSON.stringify({ five_hour: { used_percentage: 10 }, seven_day: { used_percentage: 30 } });
     return '{}';
   },
@@ -48,7 +52,8 @@ vi.mock('child_process', () => ({ spawn: (executable: string) => {
     state.requests.push(request);
     const respond = () => {
       if (state.fail) { child.emit('error', { code: 'ENOENT' }); return; }
-      const result = request.id === 3 ? { rateLimits: { primary: { usedPercent: 18, windowDurationMins: 300 } } } : {};
+      const result = request.id === 3 ? { rateLimits: { primary: { usedPercent: 18, windowDurationMins: 300 } } }
+        : request.id === 2 ? { account: { type: 'chatgpt', email: 'me@example.com', planType: 'plus' } } : {};
       child.stdout.emit('data', Buffer.from(JSON.stringify({ id: request.id, result }) + '\n'));
     };
     if (request.id === 3 && state.limitsDelay) setTimeout(respond, state.limitsDelay);
@@ -187,5 +192,10 @@ describe('extension integration', () => {
     const priorities = state.items.map(item => item.priority);
     expect(priorities).toEqual([...priorities].sort((a, b) => b - a));
     for (const priority of priorities) expect(priority).toBeGreaterThan(100);
+  });
+
+  it('shows the Codex name from the local token when the app-server returns only an email', async () => {
+    await start();
+    expect(state.items[1].tooltip).toContain('Sergey (me@example.com)');
   });
 });

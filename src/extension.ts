@@ -517,7 +517,8 @@ export function activate(context: vscode.ExtensionContext) {
     if (codexFetchPending) return;
     codexFetchPending = true;
     fetchCodexLimits(label => {
-      cachedCodexAccountLabel = label || readCodexAccountLabel();
+      // app-server отдаёт только почту, а в id_token есть и имя — он главный, ответ сервера запасной.
+      cachedCodexAccountLabel = readCodexAccountLabel() || label;
       applyTooltips(getLang());
     }, error => { codexFetchError = error; }).then(limits => {
       codexFetchPending = false;

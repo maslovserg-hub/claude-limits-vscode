@@ -56,7 +56,7 @@ The extension requests live rate-limit data from the local Codex app-server. If 
 
 Codex requests allow up to 60 seconds for slow responses, reuse the current authentication without forcing a token refresh on each poll, and avoid overlapping requests.
 
-The signed-in Codex account shown in the tooltip comes from the app-server when it provides one, and otherwise from the local `~/.codex/auth.json`.
+The signed-in Codex account shown in the tooltip (name and email) comes from the local `~/.codex/auth.json`; the app-server answer is used only as a fallback, because it returns the email without the name.
 
 Only windows actually returned by Codex are displayed. For example, an account that exposes only a weekly limit shows only `Week` / `Неделя`.
 
