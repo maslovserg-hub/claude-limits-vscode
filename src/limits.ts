@@ -85,37 +85,69 @@ export function formatTimeRemaining(resetsAt: string): string {
 }
 
 export type Lang = 'ru' | 'en';
+export type LabelStyle = 'words' | 'letters';
+export type ShortWindowLabel = 'session' | '5h';
+export type WindowKind = 'session' | 'week' | 'month';
 
-const LABELS: Record<Lang, { session: string; week: string }> = {
-  ru: { session: 'Сессия', week: 'Неделя' },
-  en: { session: 'Session', week: 'Week' },
+export interface ViewOptions {
+  labels?: LabelStyle;
+  showServiceNames?: boolean;
+  shortWindowLabel?: ShortWindowLabel;
+}
+
+const LABELS: Record<Lang, Record<WindowKind, string>> = {
+  ru: { session: 'Сессия', week: 'Неделя', month: 'Месяц' },
+  en: { session: 'Session', week: 'Week', month: 'Month' },
 };
 
-export function formatFiveHourText(limits: LimitsData, lang: Lang = 'en', showProgressBars = true): string {
-  const bar = showProgressBars ? formatProgressBar(limits.fiveHour) + ' ' : '';
-  const emoji = getStatusEmoji(limits.fiveHour);
-  const time = limits.fiveHourResetsAt ? ` (~${formatTimeRemaining(limits.fiveHourResetsAt)})` : '';
-  return `${LABELS[lang].session}: ${bar}${emoji}${limits.fiveHour}%${time}`;
+const LETTERS: Record<Lang, Record<WindowKind, string>> = {
+  ru: { session: 'С', week: 'Н', month: 'М' },
+  en: { session: 'S', week: 'W', month: 'M' },
+};
+
+const FIVE_HOURS: Record<Lang, string> = { ru: '5ч', en: '5h' };
+
+export function getWindowLabel(kind: WindowKind, lang: Lang, view: ViewOptions = {}): string {
+  if (kind === 'session' && view.shortWindowLabel === '5h') return FIVE_HOURS[lang];
+  return (view.labels === 'letters' ? LETTERS : LABELS)[lang][kind];
 }
 
-export function formatSevenDayText(limits: LimitsData, lang: Lang = 'en', showProgressBars = true): string {
-  const bar = showProgressBars ? formatProgressBar(limits.sevenDay) + ' ' : '';
-  const emoji = getStatusEmoji(limits.sevenDay);
-  const time = limits.sevenDayResetsAt ? ` (~${formatTimeRemaining(limits.sevenDayResetsAt)})` : '';
-  return `${LABELS[lang].week}: ${bar}${emoji}${limits.sevenDay}%${time}`;
+// «S» у Sonnet совпадает с сессией только в английских буквах — там Sonnet становится «Sn».
+function getSonnetLabel(lang: Lang, view: ViewOptions): string {
+  return lang === 'en' && view.labels === 'letters' && view.shortWindowLabel !== '5h' ? 'Sn' : 'S';
 }
 
-export function formatSevenDaySonnetText(limits: LimitsData): string | null {
+export function withServiceName(name: string, text: string, view: ViewOptions = {}): string {
+  return view.showServiceNames === false ? text : `${name}: ${text}`;
+}
+
+function formatWindowText(label: string, pct: number, resetsAt: string | undefined, showProgressBars: boolean): string {
+  const bar = showProgressBars ? formatProgressBar(pct) + ' ' : '';
+  const time = resetsAt ? ` (~${formatTimeRemaining(resetsAt)})` : '';
+  return `${label}: ${bar}${getStatusEmoji(pct)}${pct}%${time}`;
+}
+
+export function formatFiveHourText(limits: LimitsData, lang: Lang = 'en', showProgressBars = true, view: ViewOptions = {}): string {
+  return formatWindowText(getWindowLabel('session', lang, view), limits.fiveHour, limits.fiveHourResetsAt, showProgressBars);
+}
+
+export function formatSevenDayText(limits: LimitsData, lang: Lang = 'en', showProgressBars = true, view: ViewOptions = {}): string {
+  return formatWindowText(getWindowLabel('week', lang, view), limits.sevenDay, limits.sevenDayResetsAt, showProgressBars);
+}
+
+export function formatSevenDaySonnetText(limits: LimitsData, lang: Lang = 'en', view: ViewOptions = {}): string | null {
   if (typeof limits.sevenDaySonnet !== 'number') return null;
   const emoji = getStatusEmoji(limits.sevenDaySonnet);
-  return `S: ${emoji}${limits.sevenDaySonnet}%`;
+  return `${getSonnetLabel(lang, view)}: ${emoji}${limits.sevenDaySonnet}%`;
 }
 
-export function formatStatusText(limits: LimitsData, lang: Lang = 'en', showProgressBars = true): string {
-  const base = `${formatFiveHourText(limits, lang, showProgressBars)} | ${formatSevenDayText(limits, lang, showProgressBars)}`;
-  const sonnet = formatSevenDaySonnetText(limits);
-  if (!sonnet) return `Claude: ${base}`;
-  return `Claude: ${base} | ${sonnet}`;
+export function formatStatusText(limits: LimitsData, lang: Lang = 'en', showProgressBars = true, view: ViewOptions = {}): string {
+  const blocks = [
+    formatFiveHourText(limits, lang, showProgressBars, view),
+    formatSevenDayText(limits, lang, showProgressBars, view),
+    formatSevenDaySonnetText(limits, lang, view),
+  ].filter((block): block is string => Boolean(block));
+  return withServiceName('Claude', blocks.join(' | '), view);
 }
 
 function parseCodexReset(value: unknown): string | undefined {
@@ -221,31 +253,27 @@ export function parseCodexLimitsFromAppServerRateLimits(rateLimits: unknown): Co
   };
 }
 
-function getCodexWindowLabel(windowMinutes: number, lang: Lang): string {
-  if (windowMinutes >= 10080) return LABELS[lang].week;
-  if (windowMinutes <= 300) return LABELS[lang].session;
+function getCodexWindowLabel(windowMinutes: number, lang: Lang, view: ViewOptions): string {
+  if (windowMinutes >= 10080) return getWindowLabel('week', lang, view);
+  if (windowMinutes <= 300) return getWindowLabel('session', lang, view);
   const hours = Math.round(windowMinutes / 60);
   return hours >= 1 ? `${hours}h` : `${windowMinutes}m`;
 }
 
-export function formatCodexWindowText(window: CodexLimitWindow, lang: Lang = 'en', showProgressBars = true): string {
+export function formatCodexWindowText(window: CodexLimitWindow, lang: Lang = 'en', showProgressBars = true, view: ViewOptions = {}): string {
   if (window.label) {
     const emoji = getStatusEmoji(window.usedPercent);
     return `${window.label}: ${emoji}${window.usedPercent}%`;
   }
-
-  const bar = showProgressBars ? formatProgressBar(window.usedPercent) + ' ' : '';
-  const emoji = getStatusEmoji(window.usedPercent);
-  const time = window.resetsAt ? ` (~${formatTimeRemaining(window.resetsAt)})` : '';
-  return `${getCodexWindowLabel(window.windowMinutes, lang)}: ${bar}${emoji}${window.usedPercent}%${time}`;
+  return formatWindowText(getCodexWindowLabel(window.windowMinutes, lang, view), window.usedPercent, window.resetsAt, showProgressBars);
 }
 
-export function formatCodexStatusText(limits: CodexLimitsData, lang: Lang = 'en', showProgressBars = true): string {
+export function formatCodexStatusText(limits: CodexLimitsData, lang: Lang = 'en', showProgressBars = true, view: ViewOptions = {}): string {
   const blocks = [limits.secondary, limits.primary, limits.individual]
     .filter((window): window is CodexLimitWindow => Boolean(window))
     .sort((a, b) => a.windowMinutes - b.windowMinutes)
-    .map(window => formatCodexWindowText(window, lang, showProgressBars));
-  return blocks.length > 0 ? `Codex: ${blocks.join(' | ')}` : 'Codex Limits: N/A';
+    .map(window => formatCodexWindowText(window, lang, showProgressBars, view));
+  return blocks.length > 0 ? withServiceName('Codex', blocks.join(' | '), view) : 'Codex Limits: N/A';
 }
 
 // Codex-аккаунт: app-server может вернуть account: null, тогда имя и почту берём из id_token в ~/.codex/auth.json.

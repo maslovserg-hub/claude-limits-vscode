@@ -338,3 +338,48 @@ describe('optional progress bars', () => {
     expect(compact).not.toContain('  ');
   });
 });
+
+describe('view options', () => {
+  const limits = { fiveHour: 42, sevenDay: 18, sevenDaySonnet: 5 };
+
+  it('keeps the current words output by default', () => {
+    expect(formatStatusText(limits, 'en', false)).toBe('Claude: Session: 42% | Week: 18% | S: 5%');
+  });
+
+  it('uses letters and 5h labels', () => {
+    expect(formatStatusText(limits, 'en', false, { labels: 'letters' })).toBe('Claude: S: 42% | W: 18% | Sn: 5%');
+    expect(formatStatusText(limits, 'en', false, { labels: 'letters', shortWindowLabel: '5h' })).toBe('Claude: 5h: 42% | W: 18% | S: 5%');
+    expect(formatStatusText(limits, 'en', false, { shortWindowLabel: '5h' })).toBe('Claude: 5h: 42% | Week: 18% | S: 5%');
+    expect(formatStatusText(limits, 'ru', false, { labels: 'letters' })).toBe('Claude: С: 42% | Н: 18% | S: 5%');
+    expect(formatStatusText(limits, 'ru', false, { shortWindowLabel: '5h' })).toBe('Claude: 5ч: 42% | Неделя: 18% | S: 5%');
+  });
+
+  it('keeps progress bars with letters', () => {
+    expect(formatStatusText({ fiveHour: 50, sevenDay: 25 }, 'en', true, { labels: 'letters' })).toBe('Claude: S: ███░░░ 50% | W: ██░░░░ 25%');
+  });
+
+  it('hides service names', () => {
+    expect(formatStatusText(limits, 'en', false, { labels: 'letters', shortWindowLabel: '5h', showServiceNames: false })).toBe('5h: 42% | W: 18% | S: 5%');
+    const codex = { primary: { usedPercent: 12, windowMinutes: 300 }, secondary: { usedPercent: 50, windowMinutes: 10080 } };
+    expect(formatCodexStatusText(codex, 'en', false, { labels: 'letters', showServiceNames: false })).toBe('S: 12% | W: 50%');
+    expect(formatCodexStatusText(codex, 'en', false, { shortWindowLabel: '5h' })).toBe('Codex: 5h: 12% | Week: 50%');
+  });
+
+  it('renders every combination of view settings in both languages', () => {
+    for (const lang of ['en', 'ru'] as const)
+      for (const labels of ['words', 'letters'] as const)
+        for (const shortWindowLabel of ['session', '5h'] as const)
+          for (const showServiceNames of [true, false])
+            for (const bars of [true, false]) {
+              const text = formatStatusText(limits, lang, bars, { labels, shortWindowLabel, showServiceNames });
+              expect(text.startsWith('Claude: ')).toBe(showServiceNames);
+              expect(/[█░]/.test(text)).toBe(bars);
+              const first = shortWindowLabel === '5h'
+                ? (lang === 'en' ? '5h' : '5ч')
+                : labels === 'letters' ? (lang === 'en' ? 'S' : 'С') : (lang === 'en' ? 'Session' : 'Сессия');
+              expect(text.replace('Claude: ', '').startsWith(first + ': ')).toBe(true);
+              const sonnet = lang === 'en' && labels === 'letters' && shortWindowLabel === 'session' ? 'Sn' : 'S';
+              expect(text.endsWith(`| ${sonnet}: 5%`)).toBe(true);
+            }
+  });
+});
