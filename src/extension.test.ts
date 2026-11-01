@@ -17,8 +17,8 @@ const state = vi.hoisted(() => ({
 vi.mock('vscode', () => ({
   extensions: { getExtension: () => ({ extensionPath: '/codex-extension' }) },
   StatusBarAlignment: { Right: 1 },
-  window: { createStatusBarItem: () => {
-    const item = { text: '', tooltip: '', visible: false, show() { this.visible = true; }, hide() { this.visible = false; } };
+  window: { createStatusBarItem: (_alignment: number, priority: number) => {
+    const item = { priority, text: '', tooltip: '', visible: false, show() { this.visible = true; }, hide() { this.visible = false; } };
     state.items.push(item); return item;
   } },
   workspace: {
@@ -175,5 +175,12 @@ describe('extension integration', () => {
   it('sends the extension version to the Codex app-server', async () => {
     await start();
     expect(state.requests.find(request => request.method === 'initialize').params.clientInfo.version).toBe('9.9.9');
+  });
+
+  it('keeps all indicators together above the common priority 100', async () => {
+    await start();
+    const priorities = state.items.map(item => item.priority);
+    expect(priorities).toEqual([...priorities].sort((a, b) => b - a));
+    for (const priority of priorities) expect(priority).toBeGreaterThan(100);
   });
 });

@@ -348,9 +348,10 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
 
+  // Все три выше распространённого приоритета 100 (Live Server и др.) и подряд — чтобы чужие элементы не вставали между ними.
   const claudeItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
-  const codexItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  const kimiItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+  const codexItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100.99);
+  const kimiItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100.98);
   claudeItem.command = 'claudeLimits.refresh';
   codexItem.command = 'claudeLimits.refresh';
   kimiItem.command = 'claudeLimits.refresh';
