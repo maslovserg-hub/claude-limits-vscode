@@ -95,6 +95,11 @@ describe('formatProgressBar', () => {
   it('rounds correctly for 42%', () => {
     expect(formatProgressBar(42)).toBe('███░░░');
   });
+
+  it('clamps out-of-range percents instead of throwing', () => {
+    expect(formatProgressBar(110)).toBe('██████');
+    expect(formatProgressBar(-10)).toBe('░░░░░░');
+  });
 });
 
 describe('getColor', () => {

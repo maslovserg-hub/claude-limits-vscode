@@ -67,7 +67,8 @@ export function parseLimits(jsonStr: string): LimitsData | null {
 }
 
 export function formatProgressBar(pct: number): string {
-  const filled = Math.round((pct / 100) * BAR_WIDTH);
+  // Сервис может вернуть больше 100%: без зажима repeat() получит отрицательное число и бросит RangeError.
+  const filled = Math.min(BAR_WIDTH, Math.max(0, Math.round((pct / 100) * BAR_WIDTH)));
   return '█'.repeat(filled) + '░'.repeat(BAR_WIDTH - filled);
 }
 

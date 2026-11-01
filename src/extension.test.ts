@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   kimiStatus: 200,
   refreshCommand: undefined as undefined | (() => void),
   claudeToken: false,
+  settings: '{}',
+  writes: [] as string[],
 }));
 vi.mock('vscode', () => ({
   extensions: { getExtension: () => ({ extensionPath: '/codex-extension' }) },
@@ -31,7 +33,7 @@ vi.mock('vscode', () => ({
   commands: { registerCommand: (_id: string, callback: () => void) => { state.refreshCommand = callback; return { dispose() {} }; } },
 }));
 vi.mock('fs', () => ({
-  existsSync: (file: string) => !state.missing.some(name => file.endsWith(name)), mkdirSync() {}, writeFileSync() {}, watchFile() {}, unwatchFile() {},
+  existsSync: (file: string) => !state.missing.some(name => file.endsWith(name)), mkdirSync() {}, writeFileSync(file: string) { state.writes.push(file); }, watchFile() {}, unwatchFile() {},
   readdirSync: () => [], statSync: () => ({ mtimeMs: Date.now() }),
   readFileSync: (file: string) => {
     if (state.missing.some(name => file.endsWith(name))) throw new Error('ENOENT');
@@ -42,6 +44,7 @@ vi.mock('fs', () => ({
       return JSON.stringify({ tokens: { id_token: `h.${claims}.s` } });
     }
     if (file.endsWith('limits.json')) return JSON.stringify({ five_hour: { used_percentage: 10 }, seven_day: { used_percentage: 30 } });
+    if (file.endsWith('settings.json')) return state.settings;
     return '{}';
   },
 }));
@@ -76,7 +79,7 @@ import { activate } from './extension';
 
 describe('extension integration', () => {
   beforeEach(() => { vi.useFakeTimers(); state.bars = true; state.fail = false; state.limitsDelay = 0; state.requests = []; state.items = []; state.spawned = [];
-    state.config = {}; state.missing = []; state.kimiExpiresAt = Date.now() / 1000 + 900; state.kimiStatus = 200; state.claudeToken = false; fetchMock.mockClear(); });
+    state.config = {}; state.missing = []; state.kimiExpiresAt = Date.now() / 1000 + 900; state.kimiStatus = 200; state.claudeToken = false; state.settings = '{}'; state.writes = []; fetchMock.mockClear(); });
   afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
   async function start() {
     activate({
@@ -87,6 +90,11 @@ describe('extension integration', () => {
     for (let i = 0; i < 10; i++) await Promise.resolve();
     await vi.advanceTimersByTimeAsync(0);
   }
+  it('never overwrites an unreadable Claude settings.json', async () => {
+    state.settings = '{"model": "opus",';
+    await start();
+    expect(state.writes.filter(file => file.endsWith('settings.json'))).toHaveLength(0);
+  });
   it('accepts slow limit responses without forcing token refresh or starting duplicate requests', async () => {
     state.limitsDelay = 25000;
     await start();

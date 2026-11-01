@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.4.1]
+- **Claude settings stay safe** — if `~/.claude/settings.json` cannot be read or parsed, the extension leaves it alone instead of rewriting it with only the limits hook
+- **Usage above 100% no longer breaks the status bar** — the progress bar is clamped to full, so Codex and Kimi indicators keep updating
+
 ## [0.4.0]
 - **Kimi Code monitoring** — a third status bar indicator with the 5-hour window and the monthly limit (plus the weekly one if your plan has it). The data comes from the same usage endpoint the `/usage` command in Kimi Code uses
 - **Read-only for Kimi** — the extension uses the token Kimi Code keeps fresh while it is open, and never refreshes it or writes to Kimi files. When Kimi Code is closed, the last known numbers stay visible and the tooltip explains why; a window whose reset time has passed shows 0%

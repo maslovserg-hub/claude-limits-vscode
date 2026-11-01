@@ -16,3 +16,4 @@ tools/**
 resources/*.svg
 docs/**
 icon_old.png
+.worktrees/**

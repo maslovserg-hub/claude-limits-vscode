@@ -314,8 +314,9 @@ function ensureHookSetup(): boolean {
       fs.writeFileSync(HOOK_SCRIPT, HOOK_CONTENT, { mode: 0o755 });
     }
 
+    // Нечитаемый или битый settings.json не трогаем: перезапись стёрла бы все настройки пользователя.
     let settings: Record<string, unknown> = {};
-    try { settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8')); } catch {}
+    if (fs.existsSync(CLAUDE_SETTINGS)) settings = JSON.parse(fs.readFileSync(CLAUDE_SETTINGS, 'utf8'));
 
     const hookCmd = `bash "${HOOK_SCRIPT.replace(/\\/g, '/')}"`;
 
