@@ -93,6 +93,13 @@
           "fontPath": "./resources/service-icons.woff",
           "fontCharacter": "\\E002"
         }
+      },
+      "claude-limits-kimi": {
+        "description": "Kimi service logo",
+        "default": {
+          "fontPath": "./resources/service-icons.woff",
+          "fontCharacter": "\\E003"
+        }
       }
     }
   },

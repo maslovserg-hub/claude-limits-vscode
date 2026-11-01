@@ -11,7 +11,7 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.svgLib.path import parse_path
 
 root = Path(__file__).resolve().parent.parent
-names = [".notdef", "claude", "codex"]
+names = [".notdef", "claude", "codex", "kimi"]
 glyphs = {".notdef": TTGlyphPen(None).glyph()}
 for name in names[1:]:
     svg = ElementTree.parse(root / "resources" / (name + ".svg")).getroot()
@@ -24,7 +24,7 @@ for name in names[1:]:
 
 font = FontBuilder(1000, isTTF=True)
 font.setupGlyphOrder(names)
-font.setupCharacterMap({0xE001: "claude", 0xE002: "codex"})
+font.setupCharacterMap({0xE001: "claude", 0xE002: "codex", 0xE003: "kimi"})
 font.setupGlyf(glyphs)
 font.setupHorizontalMetrics({name: (1000, getattr(glyphs[name], "xMin", 0)) for name in names})
 font.setupHorizontalHeader(ascent=1000, descent=0)
