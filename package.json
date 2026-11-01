@@ -1,7 +1,7 @@
 {
   "name": "claude-limits",
-  "displayName": "Claude & Codex Limits",
-  "description": "Monitor Claude Code and Codex usage limits in separate VS Code status bar indicators.",
+  "displayName": "AI Limits — Claude, Codex, Kimi",
+  "description": "Monitor Claude Code, Codex and Kimi Code usage limits in separate VS Code status bar indicators.",
   "version": "0.3.4",
   "publisher": "maslovserg",
   "icon": "icon.png",
@@ -15,6 +15,18 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "codex",
+    "kimi",
+    "kimi code",
+    "moonshot",
+    "usage",
+    "limits",
+    "rate limit",
+    "status bar"
+  ],
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -23,11 +35,11 @@
     "commands": [
       {
         "command": "claudeLimits.refresh",
-        "title": "Claude & Codex Limits: Refresh"
+        "title": "AI Limits: Refresh"
       }
     ],
     "configuration": {
-      "title": "Claude & Codex Limits",
+      "title": "AI Limits",
       "properties": {
         "claudeLimits.language": {
           "type": "string",
@@ -75,7 +87,53 @@
         "claudeLimits.showProgressBars": {
           "type": "boolean",
           "default": true,
-          "description": "Show progress bars for Claude and Codex. Disable to save status bar space; percentages and reset times remain visible."
+          "description": "Show progress bars for all services. Disable to save status bar space; percentages and reset times remain visible."
+        },
+        "claudeLimits.kimiVisibility": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "always",
+            "hidden"
+          ],
+          "enumDescriptions": [
+            "Show only when signed in to Kimi Code",
+            "Always show the Kimi indicator",
+            "Always hide the Kimi indicator"
+          ],
+          "default": "auto",
+          "description": "Controls Kimi limits visibility"
+        },
+        "claudeLimits.labels": {
+          "type": "string",
+          "enum": [
+            "words",
+            "letters"
+          ],
+          "enumDescriptions": [
+            "Words: Session / Week / Month",
+            "Letters: S / W / M (С / Н / М in Russian)"
+          ],
+          "default": "words",
+          "description": "Window labels in the status bar"
+        },
+        "claudeLimits.showServiceNames": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show service names (Claude, Codex, Kimi) next to their logos"
+        },
+        "claudeLimits.shortWindowLabel": {
+          "type": "string",
+          "enum": [
+            "session",
+            "5h"
+          ],
+          "enumDescriptions": [
+            "Session / Сессия (S / С in letters mode)",
+            "5h / 5ч — the window is a rolling 5-hour limit that can span several sessions"
+          ],
+          "default": "session",
+          "description": "Name of the 5-hour limit window"
         }
       }
     },
