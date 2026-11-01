@@ -12,6 +12,8 @@ import {
   parseCodexLimitsFromAppServerRateLimits,
   parseCodexAccountLabel,
   formatCodexStatusText,
+  parseKimiUsage,
+  formatKimiStatusText,
   shouldShowService,
 } from './limits';
 
@@ -381,5 +383,46 @@ describe('view options', () => {
               const sonnet = lang === 'en' && labels === 'letters' && shortWindowLabel === 'session' ? 'Sn' : 'S';
               expect(text.endsWith(`| ${sonnet}: 5%`)).toBe(true);
             }
+  });
+});
+
+describe('Kimi usage', () => {
+  const live = JSON.stringify({
+    limits: [{ window: { duration: 300, timeUnit: 'TIME_UNIT_MINUTE' }, detail: { limit: '100', used: '5', remaining: '95', resetTime: '2026-11-01T17:44:53.684695Z' } }],
+    usages: {
+      limit_5h: { used_ratio: 0.0524, reset_time: '2026-11-01T17:44:52Z' },
+      limit_month_total: { used_ratio: 0.0065, reset_time: '2026-12-02T00:00:00Z' },
+      limit_month_code: { used_ratio: 0.0065, reset_time: '2026-12-02T00:00:00Z' },
+    },
+  });
+
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-01T15:00:00Z')); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('parses the live response', () => {
+    expect(parseKimiUsage(live)).toEqual({
+      fiveHour: { usedPercent: 5, resetsAt: '2026-11-01T17:44:52Z' },
+      month: { usedPercent: 1, resetsAt: '2026-12-02T00:00:00Z' },
+    });
+  });
+
+  it('reads a weekly window and ratios sent as strings', () => {
+    expect(parseKimiUsage(JSON.stringify({ usages: { limit_7d: { used_ratio: '0.5' } } }))).toEqual({ sevenDay: { usedPercent: 50 } });
+  });
+
+  it('returns null for empty, broken and windowless responses', () => {
+    for (const body of ['', '{', 'null', '{}', '{"usages":{}}', '{"usages":{"limit_5h":{}}}']) {
+      expect(parseKimiUsage(body)).toBeNull();
+    }
+  });
+
+  it('formats session and month', () => {
+    expect(formatKimiStatusText(parseKimiUsage(live)!, 'en', false)).toBe('Kimi: Session: 5% (~2ч) | Month: 1% (~30д9ч)');
+    expect(formatKimiStatusText(parseKimiUsage(live)!, 'en', false, { labels: 'letters', showServiceNames: false })).toBe('S: 5% (~2ч) | M: 1% (~30д9ч)');
+  });
+
+  it('shows a window whose reset already passed as 0%', () => {
+    vi.setSystemTime(new Date('2026-11-01T18:00:00Z'));
+    expect(formatKimiStatusText(parseKimiUsage(live)!, 'en', false, { labels: 'letters' })).toBe('Kimi: S: 0% | M: 1% (~30д6ч)');
   });
 });

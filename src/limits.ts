@@ -21,6 +21,17 @@ export interface CodexLimitsData {
   planType?: string;
 }
 
+export interface KimiLimitWindow {
+  usedPercent: number;
+  resetsAt?: string;
+}
+
+export interface KimiLimitsData {
+  fiveHour?: KimiLimitWindow;
+  sevenDay?: KimiLimitWindow;
+  month?: KimiLimitWindow;
+}
+
 export type VisibilityMode = 'auto' | 'always' | 'hidden';
 
 export function shouldShowService(mode: VisibilityMode, connected: boolean): boolean {
@@ -274,6 +285,49 @@ export function formatCodexStatusText(limits: CodexLimitsData, lang: Lang = 'en'
     .sort((a, b) => a.windowMinutes - b.windowMinutes)
     .map(window => formatCodexWindowText(window, lang, showProgressBars, view));
   return blocks.length > 0 ? withServiceName('Codex', blocks.join(' | '), view) : 'Codex Limits: N/A';
+}
+
+function parseKimiWindow(raw: unknown): KimiLimitWindow | undefined {
+  const entry = raw as { used_ratio?: unknown; reset_time?: unknown } | null;
+  const value = entry?.used_ratio;
+  const ratio = typeof value === 'number' ? value : typeof value === 'string' && value.trim() ? Number(value) : NaN;
+  if (!Number.isFinite(ratio)) return undefined;
+  const window: KimiLimitWindow = { usedPercent: Math.round(ratio * 100) };
+  if (typeof entry?.reset_time === 'string' && entry.reset_time) window.resetsAt = entry.reset_time;
+  return window;
+}
+
+// Ответ GET https://api.kimi.com/coding/v1/usages — тот же, что читает /usage в Kimi Code.
+export function parseKimiUsage(jsonStr: string): KimiLimitsData | null {
+  try {
+    const usages = JSON.parse(jsonStr)?.usages;
+    const limits: KimiLimitsData = {};
+    const fiveHour = parseKimiWindow(usages?.limit_5h);
+    const sevenDay = parseKimiWindow(usages?.limit_7d);
+    const month = parseKimiWindow(usages?.limit_month_total);
+    if (fiveHour) limits.fiveHour = fiveHour;
+    if (sevenDay) limits.sevenDay = sevenDay;
+    if (month) limits.month = month;
+    return fiveHour || sevenDay || month ? limits : null;
+  } catch {
+    return null;
+  }
+}
+
+export function formatKimiStatusText(limits: KimiLimitsData, lang: Lang = 'en', showProgressBars = true, view: ViewOptions = {}): string {
+  const windows: [WindowKind, KimiLimitWindow | undefined][] = [
+    ['session', limits.fiveHour],
+    ['week', limits.sevenDay],
+    ['month', limits.month],
+  ];
+  const blocks = windows
+    .filter((entry): entry is [WindowKind, KimiLimitWindow] => Boolean(entry[1]))
+    .map(([kind, window]) => {
+      // Kimi может быть закрыт часами, а цифры — из кеша: окно, чей сброс уже прошёл, пустое.
+      const expired = window.resetsAt !== undefined && new Date(window.resetsAt).getTime() <= Date.now();
+      return formatWindowText(getWindowLabel(kind, lang, view), expired ? 0 : window.usedPercent, expired ? undefined : window.resetsAt, showProgressBars);
+    });
+  return withServiceName('Kimi', blocks.join(' | '), view);
 }
 
 // Codex-аккаунт: app-server может вернуть account: null, тогда имя и почту берём из id_token в ~/.codex/auth.json.
