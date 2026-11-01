@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0]
+- **Kimi Code monitoring** — a third status bar indicator with the 5-hour window and the monthly limit (plus the weekly one if your plan has it). The data comes from the same usage endpoint the `/usage` command in Kimi Code uses
+- **Read-only for Kimi** — the extension uses the token Kimi Code keeps fresh while it is open, and never refreshes it or writes to Kimi files. When Kimi Code is closed, the last known numbers stay visible and the tooltip explains why; a window whose reset time has passed shows 0%
+- **New name and icon** — the extension is now called **AI Limits — Claude, Codex, Kimi**. The extension ID (`maslovserg.claude-limits`) and all `claudeLimits.*` settings stay the same
+- **Compact view settings** — `claudeLimits.labels` (words or letters: `S / W / M`, `С / Н / М`), `claudeLimits.showServiceNames` (hide `Claude:` / `Codex:` / `Kimi:` and keep only the logo) and `claudeLimits.shortWindowLabel` (call the 5-hour window `Session` or `5h`). Together with `showProgressBars` they apply to all three services immediately
+- **`auto` visibility means "signed in"** — Codex and Kimi appear only when you are signed in (`~/.codex/auth.json`, `~/.kimi-code/credentials/kimi-code.json`). An installed extension without a login no longer shows an empty Codex indicator, and the indicator hides again after you sign out
+- **Codex fixes from 0.3.4 reach the Marketplace** — 60-second timeout for slow responses, no overlapping requests, no forced token refresh, and the bundled `codex.exe` from the VS Code Codex extension
+- The version sent to the Codex app-server now comes from the extension itself instead of a hard-coded value
+
 ## [0.3.4]
 - Fixed Codex limits getting stuck when responses take longer than 10 seconds: allow up to 60 seconds, avoid forced token refresh on each poll, and prevent overlapping requests.
 - Aligned service logo font metrics with VS Code icons.

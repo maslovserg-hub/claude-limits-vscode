@@ -2,7 +2,7 @@
   "name": "claude-limits",
   "displayName": "AI Limits — Claude, Codex, Kimi",
   "description": "Monitor Claude Code, Codex and Kimi Code usage limits in separate VS Code status bar indicators.",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "publisher": "maslovserg",
   "icon": "icon.png",
   "repository": {

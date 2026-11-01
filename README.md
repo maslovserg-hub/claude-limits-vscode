@@ -1,17 +1,19 @@
-# Claude & Codex Limits
+# AI Limits — Claude, Codex, Kimi
 
-Monitor **Claude Code** and **Codex** usage limits directly in the VS Code status bar. Each service has its own independent indicator with progress bars, usage percentages, and reset countdowns.
+Monitor **Claude Code**, **Codex** and **Kimi Code** usage limits directly in the VS Code status bar. Each service has its own independent indicator with progress bars, usage percentages, and reset countdowns.
 
 ## Features
 
-- **Separate Claude and Codex indicators** — both services keep their complete status text and can be positioned independently by VS Code
+- **Separate Claude, Codex and Kimi indicators** — each service keeps its complete status text and can be positioned independently by VS Code
 - **Claude limits** — 5-hour session, 7-day all-models limit, and the optional 7-day Sonnet limit
 - **Codex limits** — displays the real usage windows returned by the local Codex app-server
+- **Kimi Code limits** — 5-hour window and monthly limit (weekly too, if your plan has one), read-only
 - **Visual progress bars** — compact six-segment bars with percentage usage
 - **Reset countdowns** — shows the approximate time until each available window resets
 - **Warning indicators** — 🟡 at 60–79% usage and 🔴 at 80%+
-- **Shared refresh** — click either indicator to refresh Claude and Codex together
-- **Automatic refresh** — both services update every 5 minutes
+- **Shared refresh** — click any indicator to refresh all services together
+- **Automatic refresh** — all services update every 5 minutes
+- **Compact view** — letters instead of words, no service names, no progress bars, `5h` instead of `Session` — mix as you like
 - **Per-service visibility** — show each indicator automatically, always, or never
 - **Russian and English labels** — switch languages without restarting VS Code
 - **Claude account tooltip** — hover over Claude to see the active account name and email
@@ -23,9 +25,18 @@ Example with Russian labels:
 ```text
 Claude: Сессия: ████░░ 62% (~2ч) | Неделя: ███░░░ 51% (~2д15ч)
 Codex: Неделя: █░░░░░ 14% (~6д16ч)
+Kimi: Сессия: ░░░░░░ 5% (~2ч) | Месяц: ░░░░░░ 1% (~30д)
 ```
 
-Claude and Codex are separate status bar items. Other extensions may appear between them. Clicking either item runs the same refresh command and updates both services.
+The same in the most compact view (letters, `5h`, no names, no bars — each line starts with the service logo):
+
+```text
+5ч: 🟡62% (~2ч) | Н: 51% (~2д15ч)
+Н: 14% (~6д16ч)
+5ч: 5% (~2ч) | М: 1% (~30д)
+```
+
+Each service is a separate status bar item. Other extensions may appear between them. Clicking any item runs the same refresh command and updates all services.
 
 The displayed percentage is the portion of the limit already used. A value of `100%` means the limit is exhausted.
 
@@ -49,6 +60,12 @@ The signed-in Codex account shown in the tooltip comes from the app-server when 
 
 Only windows actually returned by Codex are displayed. For example, an account that exposes only a weekly limit shows only `Week` / `Неделя`.
 
+### Kimi Code
+
+Every 5 minutes, the extension reads the access token from `~/.kimi-code/credentials/kimi-code.json` and requests `https://api.kimi.com/coding/v1/usages` — the same endpoint the `/usage` command in Kimi Code uses.
+
+The extension is read-only here: it never refreshes the token and never writes to Kimi files. The token lives about 15 minutes and is renewed by Kimi Code while it is open. When Kimi Code is closed, the indicator keeps the last known numbers and the tooltip says they are out of date; a window whose reset time has already passed is shown as 0%. Open Kimi Code and the next refresh brings fresh numbers.
+
 ## Installation
 
 Install from the Visual Studio Marketplace or install a local `.vsix`:
@@ -62,25 +79,32 @@ Install from the Visual Studio Marketplace or install a local `.vsix`:
 - VS Code 1.85 or newer
 - Claude Code installed and signed in to display Claude limits
 - Codex VS Code extension installed and signed in, or a supported local Codex executable, to display Codex limits (no separate desktop app required)
+- Kimi Code installed and signed in to display Kimi limits; open it from time to time to keep the numbers fresh
 - `curl` available in `PATH` (bundled with Windows 10+, macOS, and most Linux distributions)
 - Node.js available in `PATH` for the Claude Stop hook
 
-The extension can display either service independently. You do not need to use both.
+The extension can display each service independently. You do not need to use all of them.
 
 ## Settings
 
-Open VS Code Settings (`Ctrl+,`) and search for **Claude Limits**.
+Open VS Code Settings (`Ctrl+,`) and search for **AI Limits**.
 
 | Setting | Options | Default | Description |
 |---|---|---|---|
-| `claudeLimits.showProgressBars` | `true`, `false` | `true` | Show progress bars for both services; disable to save space. Applies immediately. |
+| `claudeLimits.showProgressBars` | `true`, `false` | `true` | Show progress bars for all services; disable to save space |
+| `claudeLimits.labels` | `words`, `letters` | `words` | `Session / Week / Month` or `S / W / M` (`С / Н / М` in Russian) |
+| `claudeLimits.showServiceNames` | `true`, `false` | `true` | Show `Claude:` / `Codex:` / `Kimi:` next to the logo |
+| `claudeLimits.shortWindowLabel` | `session`, `5h` | `session` | Name of the 5-hour window. It is a rolling limit that can span several sessions, so `5h` / `5ч` is also an option |
 | `claudeLimits.language` | `ru`, `en` | `en` | Language for labels and tooltips |
 | `claudeLimits.claudeVisibility` | `auto`, `always`, `hidden` | `auto` | Controls the Claude indicator |
 | `claudeLimits.codexVisibility` | `auto`, `always`, `hidden` | `auto` | Controls the Codex indicator |
+| `claudeLimits.kimiVisibility` | `auto`, `always`, `hidden` | `auto` | Controls the Kimi indicator |
+
+All view settings apply immediately to every indicator.
 
 Visibility modes:
 
-- `auto` — show the indicator only when the corresponding service is connected
+- `auto` — show the indicator only when you are signed in to the corresponding service. For Codex and Kimi this means a login file exists; an installed extension without a login does not count
 - `always` — always show the indicator, including `no data` states
 - `hidden` — never show the indicator
 
@@ -88,7 +112,7 @@ Visibility modes:
 
 | Command | Description |
 |---|---|
-| `Claude & Codex Limits: Refresh` | Immediately refresh Claude and Codex usage |
+| `AI Limits: Refresh` | Immediately refresh usage for all services |
 
 The command is available from the Command Palette and runs when either status bar indicator is clicked.
 
@@ -96,12 +120,14 @@ The command is available from the Command Palette and runs when either status ba
 
 - Claude credentials are read locally and sent only to the fixed Anthropic API endpoint used for usage data.
 - Codex limits are requested from the locally installed Codex app-server.
+- The Kimi Code token is read locally and sent only to the fixed Kimi usage endpoint. The last Kimi usage response (percentages and reset times only) is kept in VS Code storage so the numbers survive a restart.
 - Credentials and access tokens are not displayed or stored by the extension.
 - The Claude account name and email may appear in its tooltip.
 
 ## Known Limitations
 
-- Background refresh runs every 5 minutes; click either indicator for an immediate update.
+- Background refresh runs every 5 minutes; click any indicator for an immediate update.
+- Kimi numbers update only while Kimi Code is open, because only Kimi Code renews its token.
 - Available limit windows depend on the data exposed by each service and account plan.
 - Codex account details use local authentication data when `account/read` does not provide them.
 - If a service changes its local credential or rate-limit interface, a future extension update may be required.
@@ -110,4 +136,4 @@ Release history is available in [CHANGELOG.md](https://github.com/maslovserg-hub
 
 ### Service icons
 
-Claude and Codex labels include their service logos. The bundled icons follow the status bar text color and stay visible when progress bars are hidden.
+Claude, Codex and Kimi labels include their service logos. The bundled icons follow the status bar text color and stay visible when progress bars are hidden.
