@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   missing: [] as string[],
   kimiExpiresAt: 0,
   kimiStatus: 200,
+  refreshCommand: undefined as undefined | (() => void),
 }));
 vi.mock('vscode', () => ({
   extensions: { getExtension: () => ({ extensionPath: '/codex-extension' }) },
@@ -26,7 +27,7 @@ vi.mock('vscode', () => ({
       key === 'showProgressBars' ? state.bars : key in state.config ? state.config[key] : fallback }),
     onDidChangeConfiguration: (callback: any) => { state.changed = callback; return { dispose() {} }; },
   },
-  commands: { registerCommand: () => ({ dispose() {} }) },
+  commands: { registerCommand: (_id: string, callback: () => void) => { state.refreshCommand = callback; return { dispose() {} }; } },
 }));
 vi.mock('fs', () => ({
   existsSync: (file: string) => !state.missing.some(name => file.endsWith(name)), mkdirSync() {}, writeFileSync() {}, watchFile() {}, unwatchFile() {},
@@ -197,5 +198,21 @@ describe('extension integration', () => {
   it('shows the Codex name from the local token when the app-server returns only an email', async () => {
     await start();
     expect(state.items[1].tooltip).toContain('Sergey (me@example.com)');
+  });
+
+  it('refreshes every indicator on click in letters mode', async () => {
+    state.config = { labels: 'letters' };
+    await start();
+    await vi.advanceTimersByTimeAsync(30_000);
+    const before = fetchMock.mock.calls.length;
+    const spawnedBefore = state.spawned.length;
+    state.refreshCommand!();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(before);
+    expect(state.spawned.length).toBeGreaterThan(spawnedBefore);
+    for (const item of state.items) expect(item.text).not.toContain('$(sync~spin)');
+    expect(state.items[0].text).toBe('$(claude-limits-claude) Claude: S: █░░░░░ 10% | W: ██░░░░ 30%');
+    expect(state.items[1].text).toBe('$(claude-limits-codex) Codex: S: █░░░░░ 18%');
+    expect(state.items[2].text).toBe('$(claude-limits-kimi) Kimi: S: ░░░░░░ 5% | M: ░░░░░░ 1%');
   });
 });
