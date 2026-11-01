@@ -330,6 +330,18 @@ export function formatKimiStatusText(limits: KimiLimitsData, lang: Lang = 'en', 
   return withServiceName('Kimi', blocks.join(' | '), view);
 }
 
+// Профиль из GET https://api.kimi.com/coding/v1/me — тот же, что читает Kimi Code.
+export function parseKimiAccountLabel(jsonStr: string): string {
+  try {
+    const me = JSON.parse(jsonStr);
+    const email = typeof me?.email === 'string' ? me.email : '';
+    const name = typeof me?.nickname === 'string' ? me.nickname : '';
+    return name && email ? `${name} (${email})` : email || name;
+  } catch {
+    return '';
+  }
+}
+
 // Codex-аккаунт: app-server может вернуть account: null, тогда имя и почту берём из id_token в ~/.codex/auth.json.
 export function parseCodexAccountLabel(idToken: unknown): string {
   if (typeof idToken !== 'string') return '';

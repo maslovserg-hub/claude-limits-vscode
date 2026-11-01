@@ -14,6 +14,7 @@ import {
   formatCodexStatusText,
   parseKimiUsage,
   formatKimiStatusText,
+  parseKimiAccountLabel,
   shouldShowService,
 } from './limits';
 
@@ -424,5 +425,20 @@ describe('Kimi usage', () => {
   it('shows a window whose reset already passed as 0%', () => {
     vi.setSystemTime(new Date('2026-11-01T18:00:00Z'));
     expect(formatKimiStatusText(parseKimiUsage(live)!, 'en', false, { labels: 'letters' })).toBe('Kimi: S: 0% | M: 1% (~30д6ч)');
+  });
+});
+
+describe('parseKimiAccountLabel', () => {
+  it('combines nickname and email like the other services', () => {
+    expect(parseKimiAccountLabel(JSON.stringify({ user_id: 'u1', nickname: 'Sergey', email: 'me@example.com' }))).toBe('Sergey (me@example.com)');
+  });
+
+  it('falls back to whichever field is present', () => {
+    expect(parseKimiAccountLabel(JSON.stringify({ email: 'me@example.com' }))).toBe('me@example.com');
+    expect(parseKimiAccountLabel(JSON.stringify({ nickname: 'Sergey', email: '' }))).toBe('Sergey');
+  });
+
+  it('returns an empty string for broken or empty responses', () => {
+    for (const body of ['', '{', 'null', '{}']) expect(parseKimiAccountLabel(body)).toBe('');
   });
 });

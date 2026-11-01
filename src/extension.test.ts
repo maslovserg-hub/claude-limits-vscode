@@ -56,10 +56,12 @@ vi.mock('child_process', () => ({ spawn: (executable: string) => {
   };
   return child;
 } }));
-const fetchMock = vi.fn(async () => ({
+const fetchMock = vi.fn(async (url: string) => ({
   ok: state.kimiStatus === 200,
   status: state.kimiStatus,
-  text: async () => JSON.stringify({ usages: { limit_5h: { used_ratio: 0.05 }, limit_month_total: { used_ratio: 0.01 } } }),
+  text: async () => url.endsWith('/me')
+    ? JSON.stringify({ user_id: 'u1', nickname: 'Sergey', email: 'me@example.com' })
+    : JSON.stringify({ usages: { limit_5h: { used_ratio: 0.05 }, limit_month_total: { used_ratio: 0.01 } } }),
 }));
 vi.stubGlobal('fetch', fetchMock);
 import { activate } from './extension';
@@ -142,13 +144,16 @@ describe('extension integration', () => {
     expect(init.headers.Authorization).toBe('Bearer kimi-token');
     expect(state.items[2].text).toBe('$(claude-limits-kimi) Kimi: Session: ░░░░░░ 5% | Month: ░░░░░░ 1%');
     expect(state.items[2].visible).toBe(true);
+    expect(fetchMock.mock.calls.map(call => call[0])).toContain('https://api.kimi.com/coding/v1/me');
+    expect(state.items[2].tooltip).toContain('Sergey (me@example.com)');
   });
 
   it('keeps the last Kimi numbers when its token expired', async () => {
     await start();
     state.kimiExpiresAt = Date.now() / 1000 - 1;
     await vi.advanceTimersByTimeAsync(300_000);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(state.items[2].tooltip).toContain('Sergey (me@example.com)');
     expect(state.items[2].text).toContain('5%');
     expect(state.items[2].text).not.toContain('$(warning)');
     expect(state.items[2].tooltip).toContain('token expired');

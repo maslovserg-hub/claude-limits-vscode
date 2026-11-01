@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { parseLimits, formatStatusText, parseCodexLimitsFromSessionLog, parseCodexLimitsFromWhamUsage, parseCodexLimitsFromAppServerRateLimits, parseCodexAccountLabel, formatCodexStatusText, parseKimiUsage, formatKimiStatusText, withServiceName, shouldShowService, CodexLimitsData, KimiLimitsData, VisibilityMode, Lang, LabelStyle, ShortWindowLabel, ViewOptions } from './limits';
+import { parseLimits, formatStatusText, parseCodexLimitsFromSessionLog, parseCodexLimitsFromWhamUsage, parseCodexLimitsFromAppServerRateLimits, parseCodexAccountLabel, formatCodexStatusText, parseKimiUsage, formatKimiStatusText, parseKimiAccountLabel, withServiceName, shouldShowService, CodexLimitsData, KimiLimitsData, VisibilityMode, Lang, LabelStyle, ShortWindowLabel, ViewOptions } from './limits';
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const LIMITS_FILE = path.join(CLAUDE_DIR, 'limits.json');
@@ -19,6 +19,7 @@ const CODEX_REQUEST_TIMEOUT_MS = 60_000;
 const CODEX_AUTH_FILE = path.join(os.homedir(), '.codex', 'auth.json');
 const KIMI_CREDS_FILE = path.join(os.homedir(), '.kimi-code', 'credentials', 'kimi-code.json');
 const KIMI_USAGE_URL = 'https://api.kimi.com/coding/v1/usages';
+const KIMI_PROFILE_URL = 'https://api.kimi.com/coding/v1/me';
 let extensionVersion = '';
 
 function findLatestCodexSessionFiles(dir: string, limit = 20): string[] {
@@ -244,7 +245,7 @@ function fetchAccountLabel(): Promise<string> {
 }
 
 // Только чтение: токен продлевает сам Kimi Code, пока открыт. Мы его не обновляем и в файлы Kimi не пишем.
-function fetchKimiUsage(): Promise<{ body: string; error: string }> {
+function fetchKimi(url: string): Promise<{ body: string; error: string }> {
   let creds: { access_token?: unknown; expires_at?: unknown };
   try {
     creds = JSON.parse(fs.readFileSync(KIMI_CREDS_FILE, 'utf8'));
@@ -253,7 +254,7 @@ function fetchKimiUsage(): Promise<{ body: string; error: string }> {
   }
   if (typeof creds?.access_token !== 'string' || !creds.access_token) return Promise.resolve({ body: '', error: 'no credentials' });
   if (typeof creds.expires_at === 'number' && creds.expires_at * 1000 <= Date.now()) return Promise.resolve({ body: '', error: 'token expired' });
-  return fetch(KIMI_USAGE_URL, {
+  return fetch(url, {
     headers: { Authorization: `Bearer ${creds.access_token}`, Accept: 'application/json' },
     signal: AbortSignal.timeout(10_000),
   })
@@ -384,6 +385,7 @@ export function activate(context: vscode.ExtensionContext) {
   let codexFetchError = '';
   let codexFetchPending = false;
   let cachedKimiLimits: KimiLimitsData | null = parseKimiUsage(context.globalState.get<string>('kimiUsage') ?? '');
+  let cachedKimiAccountLabel = context.globalState.get<string>('kimiAccount') ?? '';
   let kimiFetchError = '';
   let claudeFetchError = '';
   let dataIsStale = false;
@@ -416,6 +418,7 @@ export function activate(context: vscode.ExtensionContext) {
       : STRINGS[lang].codexTooltip;
     if (codexFetchError && !startupGrace) codexItem.tooltip += '\n⚠ ' + STRINGS[lang].noData + ': ' + codexFetchError;
     const kimiLines = [STRINGS[lang].kimiTooltip];
+    if (cachedKimiAccountLabel) kimiLines.push(cachedKimiAccountLabel);
     if (kimiFetchError && !startupGrace) kimiLines.push(`⚠ ${STRINGS[lang].kimiStale} (${kimiFetchError})`);
     kimiItem.tooltip = kimiLines.join('\n');
   }
@@ -486,7 +489,12 @@ export function activate(context: vscode.ExtensionContext) {
     const codexLoggedIn = isCodexLoggedIn();
     if (!codexLoggedIn) { cachedCodexLimits = null; cachedCodexAccountLabel = ''; }
     const kimiLoggedIn = isKimiLoggedIn();
-    if (!kimiLoggedIn && cachedKimiLimits) { cachedKimiLimits = null; context.globalState.update('kimiUsage', undefined); }
+    if (!kimiLoggedIn && (cachedKimiLimits || cachedKimiAccountLabel)) {
+      cachedKimiLimits = null;
+      cachedKimiAccountLabel = '';
+      context.globalState.update('kimiUsage', undefined);
+      context.globalState.update('kimiAccount', undefined);
+    }
     applyTooltips(lang);
 
     const codexLimits = codexLoggedIn ? cachedCodexLimits ?? readLatestCodexLimits() : null;
@@ -521,13 +529,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   function fetchKimiAndRefresh() {
     if (!isKimiLoggedIn()) { kimiFetchError = ''; refresh(); return; }
-    fetchKimiUsage().then(({ body, error }) => {
-      const limits = parseKimiUsage(body);
+    Promise.all([fetchKimi(KIMI_USAGE_URL), fetchKimi(KIMI_PROFILE_URL)]).then(([usage, profile]) => {
+      const limits = parseKimiUsage(usage.body);
       if (limits) {
         cachedKimiLimits = limits;
-        context.globalState.update('kimiUsage', body);
+        context.globalState.update('kimiUsage', usage.body);
       }
-      kimiFetchError = limits ? '' : error || 'unexpected response';
+      const label = parseKimiAccountLabel(profile.body);
+      if (label) {
+        cachedKimiAccountLabel = label;
+        context.globalState.update('kimiAccount', label);
+      }
+      kimiFetchError = limits ? '' : usage.error || 'unexpected response';
       refresh();
     });
   }
