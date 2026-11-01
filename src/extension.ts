@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { parseLimits, formatStatusText, parseCodexLimitsFromSessionLog, parseCodexLimitsFromWhamUsage, parseCodexLimitsFromAppServerRateLimits, parseCodexAccountLabel, formatCodexStatusText, shouldShowService, CodexLimitsData, VisibilityMode, Lang } from './limits';
+import { parseLimits, formatStatusText, parseCodexLimitsFromSessionLog, parseCodexLimitsFromWhamUsage, parseCodexLimitsFromAppServerRateLimits, parseCodexAccountLabel, formatCodexStatusText, parseKimiUsage, formatKimiStatusText, withServiceName, shouldShowService, CodexLimitsData, KimiLimitsData, VisibilityMode, Lang, LabelStyle, ShortWindowLabel, ViewOptions } from './limits';
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
 const LIMITS_FILE = path.join(CLAUDE_DIR, 'limits.json');
@@ -16,6 +16,10 @@ const CODEX_SESSIONS_DIR = path.join(os.homedir(), '.codex', 'sessions');
 const REFRESH_INTERVAL_MS = 300_000;
 // Account and usage requests can take more than ten seconds during service delays.
 const CODEX_REQUEST_TIMEOUT_MS = 60_000;
+const CODEX_AUTH_FILE = path.join(os.homedir(), '.codex', 'auth.json');
+const KIMI_CREDS_FILE = path.join(os.homedir(), '.kimi-code', 'credentials', 'kimi-code.json');
+const KIMI_USAGE_URL = 'https://api.kimi.com/coding/v1/usages';
+let extensionVersion = '';
 
 function findLatestCodexSessionFiles(dir: string, limit = 20): string[] {
   const files: { file: string; mtimeMs: number }[] = [];
@@ -181,7 +185,7 @@ function fetchCodexLimitsFromAppServer(onAccountLabel: (label: string) => void, 
       method: 'initialize',
       id: 1,
       params: {
-        clientInfo: { name: 'claude-limits-vscode', title: 'Claude Limits VS Code', version: '0.3.4' },
+        clientInfo: { name: 'claude-limits-vscode', title: 'Claude Limits VS Code', version: extensionVersion },
       },
     });
   });
@@ -237,6 +241,24 @@ function fetchAccountLabel(): Promise<string> {
       return (acc.display_name ? `${acc.display_name} (${acc.email})` : acc.email) || '';
     } catch { return ''; }
   });
+}
+
+// Только чтение: токен продлевает сам Kimi Code, пока открыт. Мы его не обновляем и в файлы Kimi не пишем.
+function fetchKimiUsage(): Promise<{ body: string; error: string }> {
+  let creds: { access_token?: unknown; expires_at?: unknown };
+  try {
+    creds = JSON.parse(fs.readFileSync(KIMI_CREDS_FILE, 'utf8'));
+  } catch {
+    return Promise.resolve({ body: '', error: 'no credentials' });
+  }
+  if (typeof creds?.access_token !== 'string' || !creds.access_token) return Promise.resolve({ body: '', error: 'no credentials' });
+  if (typeof creds.expires_at === 'number' && creds.expires_at * 1000 <= Date.now()) return Promise.resolve({ body: '', error: 'token expired' });
+  return fetch(KIMI_USAGE_URL, {
+    headers: { Authorization: `Bearer ${creds.access_token}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
+  })
+    .then(async res => res.ok ? { body: await res.text(), error: '' } : { body: '', error: `HTTP ${res.status}` })
+    .catch(() => ({ body: '', error: 'network error' }));
 }
 
 const HOOK_CONTENT = `#!/usr/bin/env bash
@@ -311,6 +333,7 @@ function ensureHookSetup(): boolean {
 }
 
 export function activate(context: vscode.ExtensionContext) {
+  extensionVersion = context.extension?.packageJSON?.version ?? '';
   ensureHookSetup();
 
   if (!context.globalState.get('languageHintShown')) {
@@ -327,34 +350,40 @@ export function activate(context: vscode.ExtensionContext) {
 
   const claudeItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 101);
   const codexItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  const kimiItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
   claudeItem.command = 'claudeLimits.refresh';
   codexItem.command = 'claudeLimits.refresh';
-  context.subscriptions.push(claudeItem, codexItem);
+  kimiItem.command = 'claudeLimits.refresh';
+  context.subscriptions.push(claudeItem, codexItem, kimiItem);
 
-  const STRINGS: Record<Lang, { tooltip: string; updating: string; codexTooltip: string; staleData: string; noData: string }> = {
+  const STRINGS: Record<Lang, { tooltip: string; codexTooltip: string; kimiTooltip: string; staleData: string; kimiStale: string; noData: string; loading: string }> = {
     ru: {
       tooltip: 'Claude Limits — клик для обновления',
-      updating: '$(sync~spin) Claude Limits: обновление...',
       codexTooltip: 'Codex Limit: клик для обновления',
+      kimiTooltip: 'Kimi Code Limits — клик для обновления',
       staleData: 'Не удалось обновить лимиты — показаны последние известные данные',
+      kimiStale: 'Показаны последние известные данные — откройте Kimi Code, чтобы обновить',
       noData: 'Не удалось получить лимиты',
+      loading: 'обновление...',
     },
     en: {
       tooltip: 'Claude Limits — click to refresh',
-      updating: '$(sync~spin) Claude Limits: updating...',
       codexTooltip: 'Codex Limit: click to refresh',
+      kimiTooltip: 'Kimi Code Limits — click to refresh',
       staleData: 'Could not refresh limits — showing last known data',
+      kimiStale: 'Showing last known data — open Kimi Code to refresh',
       noData: 'Could not fetch limits',
+      loading: 'updating...',
     },
   };
 
   let cachedAccountLabel = '';
   let cachedCodexAccountLabel = '';
   let cachedCodexLimits: CodexLimitsData | null = null;
-  let codexConnected = false;
-  let codexDetected = false;
   let codexFetchError = '';
   let codexFetchPending = false;
+  let cachedKimiLimits: KimiLimitsData | null = parseKimiUsage(context.globalState.get<string>('kimiUsage') ?? '');
+  let kimiFetchError = '';
   let claudeFetchError = '';
   let dataIsStale = false;
   let startupGrace = true;
@@ -385,13 +414,16 @@ export function activate(context: vscode.ExtensionContext) {
       ? `${STRINGS[lang].codexTooltip}\n${cachedCodexAccountLabel}`
       : STRINGS[lang].codexTooltip;
     if (codexFetchError && !startupGrace) codexItem.tooltip += '\n⚠ ' + STRINGS[lang].noData + ': ' + codexFetchError;
+    const kimiLines = [STRINGS[lang].kimiTooltip];
+    if (kimiFetchError && !startupGrace) kimiLines.push(`⚠ ${STRINGS[lang].kimiStale} (${kimiFetchError})`);
+    kimiItem.tooltip = kimiLines.join('\n');
   }
 
   function getLang(): Lang {
     return vscode.workspace.getConfiguration('claudeLimits').get<Lang>('language', 'en');
   }
 
-  function getVisibility(key: 'claudeVisibility' | 'codexVisibility'): VisibilityMode {
+  function getVisibility(key: 'claudeVisibility' | 'codexVisibility' | 'kimiVisibility'): VisibilityMode {
     return vscode.workspace.getConfiguration('claudeLimits').get<VisibilityMode>(key, 'auto');
   }
 
@@ -404,51 +436,77 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
 
+  // auto = есть логин: файл входа на диске. Установленное расширение без входа не считается.
+  function isCodexLoggedIn(): boolean {
+    return fs.existsSync(CODEX_AUTH_FILE);
+  }
+
+  function isKimiLoggedIn(): boolean {
+    return fs.existsSync(KIMI_CREDS_FILE);
+  }
+
+  function getView(): ViewOptions {
+    const config = vscode.workspace.getConfiguration('claudeLimits');
+    return {
+      labels: config.get<LabelStyle>('labels', 'words'),
+      showServiceNames: config.get<boolean>('showServiceNames', true),
+      shortWindowLabel: config.get<ShortWindowLabel>('shortWindowLabel', 'session'),
+    };
+  }
+
+  function showIf(item: vscode.StatusBarItem, visible: boolean): void {
+    if (visible) item.show(); else item.hide();
+  }
+
   function refresh() {
     const lang = getLang();
-    const loading = lang === 'ru' ? 'обновление...' : 'updating...';
+    const view = getView();
+    const loading = STRINGS[lang].loading;
     const showProgressBars = vscode.workspace.getConfiguration('claudeLimits').get<boolean>('showProgressBars', true);
     // Данные пишут двое: сам опрос и Stop-хук. Поэтому «несвежесть» определяется возрастом файла,
     // а не судьбой последнего запроса: пока хук обновляет лимиты, неудачный опрос не повод пугать.
     dataIsStale = isDataStale();
-    applyTooltips(lang);
     let claudeText: string;
     try {
       const content = fs.readFileSync(LIMITS_FILE, 'utf8');
       const limits = parseLimits(content);
       if (limits) {
         claudeText = dataIsStale && !startupGrace
-          ? `$(warning) ${formatStatusText(limits, lang, showProgressBars)}`
-          : formatStatusText(limits, lang, showProgressBars);
+          ? `$(warning) ${formatStatusText(limits, lang, showProgressBars, view)}`
+          : formatStatusText(limits, lang, showProgressBars, view);
       } else {
-        claudeText = startupGrace ? 'Claude: ' + loading : 'Claude: N/A';
+        claudeText = withServiceName('Claude', startupGrace ? loading : 'N/A', view);
       }
     } catch {
-      claudeText = startupGrace ? `Claude: ${loading}` : `$(warning) Claude: ${STRINGS[lang].noData}`;
+      claudeText = startupGrace ? withServiceName('Claude', loading, view) : '$(warning) ' + withServiceName('Claude', STRINGS[lang].noData, view);
     }
 
-    const codexLimits = cachedCodexLimits ?? readLatestCodexLimits();
+    // Вышли из аккаунта — забываем его цифры и имя, индикатор в auto скрывается.
+    const codexLoggedIn = isCodexLoggedIn();
+    if (!codexLoggedIn) { cachedCodexLimits = null; cachedCodexAccountLabel = ''; }
+    const kimiLoggedIn = isKimiLoggedIn();
+    if (!kimiLoggedIn && cachedKimiLimits) { cachedKimiLimits = null; context.globalState.update('kimiUsage', undefined); }
+    applyTooltips(lang);
+
+    const codexLimits = codexLoggedIn ? cachedCodexLimits ?? readLatestCodexLimits() : null;
     const codexText = codexLimits
-      ? (codexFetchError && !startupGrace ? '$(warning) ' : '') + formatCodexStatusText(codexLimits, lang, showProgressBars)
-      : startupGrace ? 'Codex: ' + loading : '$(warning) Codex: ' + STRINGS[lang].noData;
+      ? (codexFetchError && !startupGrace ? '$(warning) ' : '') + formatCodexStatusText(codexLimits, lang, showProgressBars, view)
+      : startupGrace ? withServiceName('Codex', loading, view) : '$(warning) ' + withServiceName('Codex', STRINGS[lang].noData, view);
+    // У Kimi при ошибке остаются последние цифры без ⚠: закрытый Kimi Code — обычное дело, причина в подсказке.
+    const kimiText = cachedKimiLimits
+      ? formatKimiStatusText(cachedKimiLimits, lang, showProgressBars, view)
+      : startupGrace ? withServiceName('Kimi', loading, view) : '$(warning) ' + withServiceName('Kimi', STRINGS[lang].noData, view);
     claudeItem.text = '$(claude-limits-claude) ' + claudeText;
     codexItem.text = '$(claude-limits-codex) ' + codexText;
-    if (shouldShowService(getVisibility('claudeVisibility'), isClaudeConnected())) {
-      claudeItem.show();
-    } else {
-      claudeItem.hide();
-    }
-    if (shouldShowService(getVisibility('codexVisibility'), codexConnected || codexDetected)) {
-      codexItem.show();
-    } else {
-      codexItem.hide();
-    }
+    kimiItem.text = '$(claude-limits-kimi) ' + kimiText;
+    showIf(claudeItem, shouldShowService(getVisibility('claudeVisibility'), isClaudeConnected()));
+    showIf(codexItem, shouldShowService(getVisibility('codexVisibility'), codexLoggedIn));
+    showIf(kimiItem, shouldShowService(getVisibility('kimiVisibility'), kimiLoggedIn));
   }
 
   function fetchCodexAndRefresh() {
     if (codexFetchPending) return;
     codexFetchPending = true;
-    codexDetected = Boolean(vscode.extensions.getExtension('openai.chatgpt')) || fs.existsSync(path.join(os.homedir(), '.codex', 'auth.json'));
     fetchCodexLimits(label => {
       cachedCodexAccountLabel = label || readCodexAccountLabel();
       applyTooltips(getLang());
@@ -456,17 +514,33 @@ export function activate(context: vscode.ExtensionContext) {
       codexFetchPending = false;
       if (!cachedCodexAccountLabel) cachedCodexAccountLabel = readCodexAccountLabel();
       if (limits) cachedCodexLimits = limits;
-      codexConnected = Boolean(limits || cachedCodexAccountLabel);
+      refresh();
+    });
+  }
+
+  function fetchKimiAndRefresh() {
+    if (!isKimiLoggedIn()) { kimiFetchError = ''; refresh(); return; }
+    fetchKimiUsage().then(({ body, error }) => {
+      const limits = parseKimiUsage(body);
+      if (limits) {
+        cachedKimiLimits = limits;
+        context.globalState.update('kimiUsage', body);
+      }
+      kimiFetchError = limits ? '' : error || 'unexpected response';
       refresh();
     });
   }
 
   function fetchAndRefresh(manualRefresh = false) {
     if (manualRefresh) {
-      claudeItem.text = '$(claude-limits-claude) ' + STRINGS[getLang()].updating;
-      codexItem.text = '$(claude-limits-codex) $(sync~spin) Codex: updating...';
-      if (shouldShowService(getVisibility('claudeVisibility'), isClaudeConnected())) claudeItem.show();
-      if (shouldShowService(getVisibility('codexVisibility'), codexConnected || codexDetected)) codexItem.show();
+      const view = getView();
+      const loading = STRINGS[getLang()].loading;
+      claudeItem.text = '$(claude-limits-claude) $(sync~spin) ' + withServiceName('Claude', loading, view);
+      codexItem.text = '$(claude-limits-codex) $(sync~spin) ' + withServiceName('Codex', loading, view);
+      kimiItem.text = '$(claude-limits-kimi) $(sync~spin) ' + withServiceName('Kimi', loading, view);
+      showIf(claudeItem, shouldShowService(getVisibility('claudeVisibility'), isClaudeConnected()));
+      showIf(codexItem, shouldShowService(getVisibility('codexVisibility'), isCodexLoggedIn()));
+      showIf(kimiItem, shouldShowService(getVisibility('kimiVisibility'), isKimiLoggedIn()));
     }
 
     fetchAccountLabel().then(label => {
@@ -475,6 +549,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     fetchCodexAndRefresh();
+    fetchKimiAndRefresh();
 
     const token = readToken();
     if (!token) { claudeFetchError = 'no credentials'; refresh(); return; }
@@ -529,7 +604,11 @@ export function activate(context: vscode.ExtensionContext) {
       e.affectsConfiguration('claudeLimits.showProgressBars') ||
       e.affectsConfiguration('claudeLimits.language') ||
       e.affectsConfiguration('claudeLimits.claudeVisibility') ||
-      e.affectsConfiguration('claudeLimits.codexVisibility')
+      e.affectsConfiguration('claudeLimits.codexVisibility') ||
+      e.affectsConfiguration('claudeLimits.kimiVisibility') ||
+      e.affectsConfiguration('claudeLimits.labels') ||
+      e.affectsConfiguration('claudeLimits.showServiceNames') ||
+      e.affectsConfiguration('claudeLimits.shortWindowLabel')
     ) {
       refresh();
     }
