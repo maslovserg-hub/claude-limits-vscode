@@ -9,7 +9,6 @@
 - **Codex fixes from 0.3.4 reach the Marketplace** — 60-second timeout for slow responses, no overlapping requests, no forced token refresh, and the bundled `codex.exe` from the VS Code Codex extension
 - **Kimi account in the tooltip** — the signed-in name and email, like Claude and Codex; remembered while Kimi Code is closed
 - **Codex tooltip shows your name again** — the app-server returns only the email, so the name and email are now taken from the local Codex login first
-- **Click refresh is visible again** — when Kimi Code is closed, its expired token no longer redraws the bar instantly and hides the spinner of every indicator
 - **Indicators stay together** — all three sit next to each other; other items with the common priority 100 (for example Live Server's Go Live) no longer squeeze in between
 - The version sent to the Codex app-server now comes from the extension itself instead of a hard-coded value
 

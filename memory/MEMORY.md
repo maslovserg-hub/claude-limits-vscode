@@ -1,6 +1,7 @@
 # Memory Index
 
-- [handoff-2026-10-26.md](handoff-2026-10-26.md) — Читать первым: исправление обновления Codex готово; на другом компьютере поднять версию до 0.3.5, собрать и подготовить публикацию.
+- [ai-limits-0.4.0-release.md](ai-limits-0.4.0-release.md) — Читать первым: 0.4.0 (Kimi, новое имя, настройки вида) собрана и проверена, ждёт публикации пользователем
+- [handoff-2026-10-26.md](handoff-2026-10-26.md) — Закрыт: 0.3.5 не выпускалась, исправления Codex вошли в 0.4.0
 
 - [feedback_changelog_readme.md](feedback_changelog_readme.md) — При любых изменениях всегда обновлять CHANGELOG.md и README.md перед упаковкой .vsix
 - [account-switch-button-abandoned.md](account-switch-button-abandoned.md) — Кнопка переключения аккаунтов невозможна (single-session per device отзывает refresh-токен) — заброшена в v0.5.0, не возвращаться
