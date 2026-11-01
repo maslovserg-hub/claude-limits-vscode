@@ -1,4 +1,5 @@
 # Memory Index
+n- [ai-limits-0.4.1-release.md](ai-limits-0.4.1-release.md) — Читать первым: 0.4.1 (фикс settings.json и >100%) собрана, ждёт загрузки; VSIX проверять через `vsce ls`
 
 - [ai-limits-0.4.0-release.md](ai-limits-0.4.0-release.md) — Читать первым: 0.4.0 (Kimi, новое имя, настройки вида) загружена в Marketplace 2026-11-01 (статус Verifying)
 - [handoff-2026-10-26.md](handoff-2026-10-26.md) — Закрыт: 0.3.5 не выпускалась, исправления Codex вошли в 0.4.0
