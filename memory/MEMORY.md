@@ -1,6 +1,6 @@
 # Memory Index
 
-- [ai-limits-0.4.0-release.md](ai-limits-0.4.0-release.md) — Читать первым: 0.4.0 (Kimi, новое имя, настройки вида) собрана и проверена, ждёт публикации пользователем
+- [ai-limits-0.4.0-release.md](ai-limits-0.4.0-release.md) — Читать первым: 0.4.0 (Kimi, новое имя, настройки вида) загружена в Marketplace 2026-11-01 (статус Verifying)
 - [handoff-2026-10-26.md](handoff-2026-10-26.md) — Закрыт: 0.3.5 не выпускалась, исправления Codex вошли в 0.4.0
 
 - [feedback_changelog_readme.md](feedback_changelog_readme.md) — При любых изменениях всегда обновлять CHANGELOG.md и README.md перед упаковкой .vsix
